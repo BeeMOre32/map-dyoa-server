@@ -1,12 +1,14 @@
 import { Elysia } from "elysia"
 import { sql } from "drizzle-orm"
 import { db } from "./db"
+import { corsPlugin } from "./plugins/cors"
 import { httpLogPlugin } from "./plugins/http-log"
 import { schedulesRoutes } from "./routes/schedules"
 
 const port = Number(process.env.PORT ?? 3001)
 
 const app = new Elysia()
+  .use(corsPlugin)
   .use(httpLogPlugin)
   .use(schedulesRoutes)
   .get("/", () => ({

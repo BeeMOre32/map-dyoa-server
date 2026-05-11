@@ -1,4 +1,4 @@
-import { and, count, desc, ilike, or, sql, type SQL } from "drizzle-orm"
+import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm"
 import { db } from "../db"
 import { clips } from "../db/schema"
 import { logApi } from "../lib/server-log"
@@ -69,43 +69,64 @@ export async function listClipsPaginated(args: {
   month?: string
   q?: string
   sort?: ClipSortOption
+  /** true면 참가자·스트리머만 조인하고 일정·게임은 제외 (`scheduleId`는 유지) */
+  clipsOnly?: boolean
 }) {
   const page = Math.max(1, args.page ?? 1)
   const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 20))
   const sort: ClipSortOption = args.sort ?? "newest"
+  const clipsOnly = Boolean(args.clipsOnly)
   const wf = clipFiltersSQL({
     streamerId: args.streamerId,
     month: args.month,
     q: args.q,
   })
 
-  const rows = await db.query.clips.findMany({
-    ...(wf ? { where: wf } : {}),
-    orderBy: (c, { asc: a, desc: d }) =>
-      sort === "title"
-        ? [a(c.title)]
-        : sort === "oldest"
-          ? [a(c.createdAt)]
-          : sort === "date_desc"
-            ? [d(c.clipDate), d(c.createdAt)]
-            : sort === "date_asc"
-              ? [a(c.clipDate), a(c.createdAt)]
-              : [d(c.createdAt)],
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-    with: {
-      participants: { with: { streamer: true } },
-      schedule: { with: { game: true } },
-    },
-  })
+  const rows = clipsOnly
+    ? await db.query.clips.findMany({
+        ...(wf ? { where: wf } : {}),
+        orderBy: (c, { asc: a, desc: d }) =>
+          sort === "title"
+            ? [a(c.title)]
+            : sort === "oldest"
+              ? [a(c.createdAt)]
+              : sort === "date_desc"
+                ? [d(c.clipDate), d(c.createdAt)]
+                : sort === "date_asc"
+                  ? [a(c.clipDate), a(c.createdAt)]
+                  : [d(c.createdAt)],
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        with: { participants: { with: { streamer: true } } },
+      })
+    : await db.query.clips.findMany({
+        ...(wf ? { where: wf } : {}),
+        orderBy: (c, { asc: a, desc: d }) =>
+          sort === "title"
+            ? [a(c.title)]
+            : sort === "oldest"
+              ? [a(c.createdAt)]
+              : sort === "date_desc"
+                ? [d(c.clipDate), d(c.createdAt)]
+                : sort === "date_asc"
+                  ? [a(c.clipDate), a(c.createdAt)]
+                  : [d(c.createdAt)],
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        with: {
+          participants: { with: { streamer: true } },
+          schedule: { with: { game: true } },
+        },
+      })
 
   const totalRow = wf
     ? await db.select({ c: count() }).from(clips).where(wf)
     : await db.select({ c: count() }).from(clips)
 
-  const total = totalRow[0]?.c ?? 0
+  const total = Number(totalRow[0]?.c ?? 0)
   logApi("clips", {
     list: true,
+    clipsOnly,
     page,
     pageSize,
     returned: rows.length,
@@ -119,24 +140,45 @@ export async function listClipsPaginated(args: {
   }
 }
 
-/** 일정 상세 사이드패널용: 해당 일정에 연결된 클립만, 생성순 */
-export async function listClipsByScheduleId(scheduleId: string) {
-  const sid = scheduleId?.trim()
+/** 일정 상세용: 해당 `scheduleId` 클립만, 참가자 포함, 생성순 페이지네이션 */
+export async function listClipsByScheduleIdPaginated(args: {
+  scheduleId: string
+  page?: number
+  pageSize?: number
+}) {
+  const sid = args.scheduleId?.trim()
   if (!sid) {
     logApi("clips", { byScheduleId: "", skipped: true })
-    return []
+    return { clips: [], total: 0, totalPages: 0 }
   }
+
+  const page = Math.max(1, args.page ?? 1)
+  const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 20))
+  const wf = eq(clips.scheduleId, sid)
 
   const rows = await db.query.clips.findMany({
     where: (c, { eq: eqFn }) => eqFn(c.scheduleId, sid),
     orderBy: (c, { asc: a }) => [a(c.createdAt)],
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
     with: {
       participants: { with: { streamer: true } },
     },
   })
 
-  logApi("clips", { byScheduleId: sid, count: rows.length })
-  return rows
+  const totalRow = await db.select({ c: count() }).from(clips).where(wf)
+  const total = Number(totalRow[0]?.c ?? 0)
+  const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize)
+
+  logApi("clips", {
+    byScheduleId: sid,
+    page,
+    pageSize,
+    returned: rows.length,
+    total,
+  })
+
+  return { clips: rows, total, totalPages }
 }
 
 export async function getClipById(id: string) {

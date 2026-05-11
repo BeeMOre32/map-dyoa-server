@@ -6,6 +6,7 @@ import {
   deleteStreamer,
   updateStreamer,
 } from "../services/streamers-mutations"
+import { getStreamerDetailBundle } from "../services/streamer-detail"
 import { getStreamerById, listStreamers } from "../services/streamers"
 
 export const streamersRoutes = new Elysia({ prefix: "/streamers" })
@@ -79,6 +80,14 @@ export const streamersRoutes = new Elysia({ prefix: "/streamers" })
       return { error: "NOT_FOUND" as const }
     }
     return { ok: true as const }
+  })
+  .get("/:id/detail", async ({ params, set }) => {
+    const row = await getStreamerById(params.id)
+    if (!row) {
+      set.status = 404
+      return { error: "NOT_FOUND" as const }
+    }
+    return getStreamerDetailBundle(params.id)
   })
   .get("/:id", async ({ params, set }) => {
     const streamer = await getStreamerById(params.id)

@@ -1,6 +1,7 @@
 import { Elysia } from "elysia"
 import { sql } from "drizzle-orm"
 import { db } from "./db"
+import { chzzkRoutes } from "./routes/chzzk"
 import { corsPlugin } from "./plugins/cors"
 import { httpLogPlugin } from "./plugins/http-log"
 import { clipsRoutes } from "./routes/clips"
@@ -15,6 +16,7 @@ const app = new Elysia()
   .use(schedulesRoutes)
   .use(streamersRoutes)
   .use(clipsRoutes)
+  .use(chzzkRoutes)
   .get("/", () => ({
     service: "map-dyoa-server",
     status: "ok",

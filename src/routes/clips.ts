@@ -30,6 +30,8 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
         : "newest"
       const page = query.page ? Number(query.page) : 1
       const pageSize = query.pageSize ? Number(query.pageSize) : 20
+      const clipsOnly =
+        query.clipsOnly === "1" || query.clipsOnly === "true"
       return listClipsPaginated({
         page: Number.isFinite(page) ? page : 1,
         pageSize: Number.isFinite(pageSize) ? pageSize : 20,
@@ -37,6 +39,7 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
         month: query.month,
         q: query.q,
         sort,
+        clipsOnly,
       })
     },
     {
@@ -47,6 +50,7 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
         month: t.Optional(t.String()),
         q: t.Optional(t.String()),
         sort: t.Optional(t.String()),
+        clipsOnly: t.Optional(t.String()),
       }),
     },
   )

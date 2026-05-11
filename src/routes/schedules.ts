@@ -2,7 +2,7 @@ import { Elysia, t } from "elysia"
 import { ZodError } from "zod"
 import { pgCode } from "../lib/pg-error"
 import { logSchedules } from "../lib/server-log"
-import { listClipsByScheduleId } from "../services/clips"
+import { listClipsByScheduleIdPaginated } from "../services/clips"
 import { createSchedule, deleteSchedule, updateSchedule } from "../services/schedules-mutations"
 import { getScheduleById, listSchedules } from "../services/schedules"
 
@@ -91,10 +91,24 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
     }
     return { ok: true as const }
   })
-  .get("/:id/clips", async ({ params }) => {
-    const clips = await listClipsByScheduleId(params.id)
-    return { clips }
-  })
+  .get(
+    "/:id/clips",
+    async ({ params, query }) => {
+      const page = query.page ? Number(query.page) : 1
+      const pageSize = query.pageSize ? Number(query.pageSize) : 20
+      return listClipsByScheduleIdPaginated({
+        scheduleId: params.id,
+        page: Number.isFinite(page) ? page : 1,
+        pageSize: Number.isFinite(pageSize) ? pageSize : 20,
+      })
+    },
+    {
+      query: t.Object({
+        page: t.Optional(t.String()),
+        pageSize: t.Optional(t.String()),
+      }),
+    },
+  )
   .get("/:id", async ({ params, set }) => {
     const schedule = await getScheduleById(params.id)
     if (!schedule) {

@@ -12,6 +12,10 @@ export function logSchedules(scope: string, fields: LogFields): void {
   console.log(`[schedules] ${scope} ${formatFields(fields)}`)
 }
 
+export function logApi(tag: string, fields: LogFields): void {
+  console.log(`[${tag}] ${formatFields(fields)}`)
+}
+
 /** 모든 HTTP 요청 한 줄 요약 */
 export function logHttp(
   method: string,

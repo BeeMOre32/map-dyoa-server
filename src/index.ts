@@ -3,7 +3,9 @@ import { sql } from "drizzle-orm"
 import { db } from "./db"
 import { corsPlugin } from "./plugins/cors"
 import { httpLogPlugin } from "./plugins/http-log"
+import { clipsRoutes } from "./routes/clips"
 import { schedulesRoutes } from "./routes/schedules"
+import { streamersRoutes } from "./routes/streamers"
 
 const port = Number(process.env.PORT ?? 3001)
 
@@ -11,6 +13,8 @@ const app = new Elysia()
   .use(corsPlugin)
   .use(httpLogPlugin)
   .use(schedulesRoutes)
+  .use(streamersRoutes)
+  .use(clipsRoutes)
   .get("/", () => ({
     service: "map-dyoa-server",
     status: "ok",

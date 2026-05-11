@@ -1,46 +1,58 @@
 import { Elysia, t } from "elysia"
 import { ZodError } from "zod"
 import { pgCode } from "../lib/pg-error"
-import { logSchedules } from "../lib/server-log"
-import { listClipsByScheduleId } from "../services/clips"
-import { createSchedule, deleteSchedule, updateSchedule } from "../services/schedules-mutations"
-import { getScheduleById, listSchedules } from "../services/schedules"
+import { createClip, deleteClip, updateClip } from "../services/clips-mutations"
+import {
+  getClipById,
+  getClipMonths,
+  listClipsPaginated,
+  type ClipSortOption,
+} from "../services/clips"
 
-export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
+const SORTS: ClipSortOption[] = [
+  "newest",
+  "oldest",
+  "date_desc",
+  "date_asc",
+  "title",
+]
+
+export const clipsRoutes = new Elysia({ prefix: "/clips" })
+  .get("/months", async () => {
+    const months = await getClipMonths()
+    return { months }
+  })
   .get(
     "/",
-    async ({ query, set }) => {
-      const result = await listSchedules({
-        from: query.from,
-        to: query.to,
-        period: query.period,
-        year: query.year,
+    async ({ query }) => {
+      const sort = SORTS.includes(query.sort as ClipSortOption)
+        ? (query.sort as ClipSortOption)
+        : "newest"
+      const page = query.page ? Number(query.page) : 1
+      const pageSize = query.pageSize ? Number(query.pageSize) : 20
+      return listClipsPaginated({
+        page: Number.isFinite(page) ? page : 1,
+        pageSize: Number.isFinite(pageSize) ? pageSize : 20,
+        streamerId: query.streamer,
         month: query.month,
+        q: query.q,
+        sort,
       })
-      if (!result.ok) {
-        logSchedules("list", { error: result.code })
-        set.status = 400
-        return { error: result.code, message: result.message }
-      }
-      return {
-        schedules: result.schedules,
-        window: result.window,
-        meta: result.meta,
-      }
     },
     {
       query: t.Object({
-        from: t.Optional(t.String()),
-        to: t.Optional(t.String()),
-        period: t.Optional(t.String()),
-        year: t.Optional(t.String()),
+        page: t.Optional(t.String()),
+        pageSize: t.Optional(t.String()),
+        streamer: t.Optional(t.String()),
         month: t.Optional(t.String()),
+        q: t.Optional(t.String()),
+        sort: t.Optional(t.String()),
       }),
     },
   )
   .post("/", async ({ body, set }) => {
     try {
-      const { id } = await createSchedule(body)
+      const { id } = await createClip(body)
       set.status = 201
       return { id }
     } catch (e) {
@@ -52,7 +64,7 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
         set.status = 400
         return {
           error: "FK_VIOLATION" as const,
-          message: "존재하지 않는 게임 또는 스트리머 참조입니다.",
+          message: "존재하지 않는 스트리머 또는 일정 참조입니다.",
         }
       }
       set.status = 500
@@ -61,7 +73,7 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
   })
   .patch("/:id", async ({ params, body, set }) => {
     try {
-      const r = await updateSchedule(params.id, body)
+      const r = await updateClip(params.id, body)
       if (!r.ok) {
         set.status = 404
         return { error: "NOT_FOUND" as const }
@@ -76,7 +88,7 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
         set.status = 400
         return {
           error: "FK_VIOLATION" as const,
-          message: "존재하지 않는 게임 또는 스트리머 참조입니다.",
+          message: "존재하지 않는 스트리머 또는 일정 참조입니다.",
         }
       }
       set.status = 500
@@ -84,22 +96,18 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
     }
   })
   .delete("/:id", async ({ params, set }) => {
-    const ok = await deleteSchedule(params.id)
+    const ok = await deleteClip(params.id)
     if (!ok) {
       set.status = 404
       return { error: "NOT_FOUND" as const }
     }
     return { ok: true as const }
   })
-  .get("/:id/clips", async ({ params }) => {
-    const clips = await listClipsByScheduleId(params.id)
-    return { clips }
-  })
   .get("/:id", async ({ params, set }) => {
-    const schedule = await getScheduleById(params.id)
-    if (!schedule) {
+    const clip = await getClipById(params.id)
+    if (!clip) {
       set.status = 404
       return { error: "NOT_FOUND" as const }
     }
-    return schedule
+    return clip
   })

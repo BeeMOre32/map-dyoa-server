@@ -1,27 +1,27 @@
-import { and, desc, eq, gte, lte } from "drizzle-orm"
+import { and, count, desc, eq } from "drizzle-orm"
 import { db } from "../db"
 import { clips, feedbacks, scheduleParticipants, schedules, streamers } from "../db/schema"
 import { logApi } from "../lib/server-log"
 
 export async function getAdminStats() {
   const [scheduleRows, clipRows, streamerRows, pendingRows] = await Promise.all([
-    db.select({ id: schedules.id }).from(schedules),
-    db.select({ id: clips.id }).from(clips),
+    db.select({ c: count() }).from(schedules),
+    db.select({ c: count() }).from(clips),
     db
-      .select({ id: streamers.id })
+      .select({ c: count() })
       .from(streamers)
       .where(eq(streamers.isGuest, false)),
     db
-      .select({ id: feedbacks.id })
+      .select({ c: count() })
       .from(feedbacks)
       .where(eq(feedbacks.status, "PENDING")),
   ])
 
   const stats = {
-    scheduleCount: scheduleRows.length,
-    clipCount: clipRows.length,
-    streamerCount: streamerRows.length,
-    pendingFeedbackCount: pendingRows.length,
+    scheduleCount: Number(scheduleRows[0]?.c ?? 0),
+    clipCount: Number(clipRows[0]?.c ?? 0),
+    streamerCount: Number(streamerRows[0]?.c ?? 0),
+    pendingFeedbackCount: Number(pendingRows[0]?.c ?? 0),
   }
   logApi("admin", { stats: true, ...stats })
   return stats

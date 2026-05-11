@@ -1,10 +1,13 @@
 import { Elysia } from "elysia"
 import { sql } from "drizzle-orm"
 import { db } from "./db"
+import { adminRoutes } from "./routes/admin"
 import { chzzkRoutes } from "./routes/chzzk"
 import { corsPlugin } from "./plugins/cors"
+import { feedbacksRoutes } from "./routes/feedbacks"
 import { httpLogPlugin } from "./plugins/http-log"
 import { clipsRoutes } from "./routes/clips"
+import { gamesRoutes } from "./routes/games"
 import { schedulesRoutes } from "./routes/schedules"
 import { streamersRoutes } from "./routes/streamers"
 
@@ -16,7 +19,10 @@ const app = new Elysia()
   .use(schedulesRoutes)
   .use(streamersRoutes)
   .use(clipsRoutes)
+  .use(gamesRoutes)
+  .use(feedbacksRoutes)
   .use(chzzkRoutes)
+  .use(adminRoutes)
   .get("/", () => ({
     service: "map-dyoa-server",
     status: "ok",

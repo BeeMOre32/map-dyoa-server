@@ -6,6 +6,7 @@ import { chzzkRoutes } from "./routes/chzzk"
 import { corsPlugin } from "./plugins/cors"
 import { feedbacksRoutes } from "./routes/feedbacks"
 import { httpLogPlugin } from "./plugins/http-log"
+import { requestTracePlugin } from "./plugins/request-trace"
 import { clipsRoutes } from "./routes/clips"
 import { gamesRoutes } from "./routes/games"
 import { schedulesRoutes } from "./routes/schedules"
@@ -15,6 +16,7 @@ const port = Number(process.env.PORT ?? 3001)
 
 const app = new Elysia()
   .use(corsPlugin)
+  .use(requestTracePlugin)
   .use(httpLogPlugin)
   .use(schedulesRoutes)
   .use(streamersRoutes)

@@ -1,7 +1,8 @@
 import { db } from "../db"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 export async function listStreamers(opts?: { membersOnly?: boolean }) {
+  logTrace("streamers.list", { membersOnly: opts?.membersOnly ?? false })
   const rows = await db.query.streamers.findMany({
     where: opts?.membersOnly
       ? (s, { eq: eqFn }) => eqFn(s.isGuest, false)
@@ -13,6 +14,7 @@ export async function listStreamers(opts?: { membersOnly?: boolean }) {
 }
 
 export async function getStreamerById(id: string) {
+  logTrace("streamers.byId", { id })
   const row = await db.query.streamers.findFirst({
     where: (s, { eq: eqFn }) => eqFn(s.id, id),
   })

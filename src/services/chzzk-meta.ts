@@ -1,5 +1,5 @@
 import { db } from "../db"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -52,6 +52,7 @@ function findCoverUrl(obj: unknown): string | null {
 }
 
 export async function getChzzkLiveMetaFromUrl(url: string) {
+  logTrace("chzzk.liveMeta", { hasUrl: Boolean(url?.trim()) })
   const channelId = extractChannelId(url)
   if (!channelId) {
     return { ok: false as const, code: "INVALID_URL", message: "유효한 치지직 URL이 아닙니다." }
@@ -96,6 +97,7 @@ export async function getChzzkLiveMetaFromUrl(url: string) {
 }
 
 export async function getChzzkClipMetaFromUrl(url: string) {
+  logTrace("chzzk.clipMeta", { hasUrl: Boolean(url?.trim()) })
   const clipId = extractChzzkClipId(url)
   if (!clipId) {
     return {

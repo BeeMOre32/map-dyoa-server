@@ -23,7 +23,7 @@ export const corsPlugin = cors({
     return allowedOriginList().includes(origin)
   },
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS", "HEAD"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
   credentials: true,
   maxAge: 86400,
   preflight: true,

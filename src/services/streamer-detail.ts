@@ -1,7 +1,7 @@
 import { and, count, eq, sql, type SQL } from "drizzle-orm"
 import { db } from "../db"
 import { clipParticipants, clips, scheduleParticipants, schedules } from "../db/schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 function schedulesForStreamerWhere(streamerId: string): SQL {
   return sql`${schedules.id} IN (
@@ -20,6 +20,7 @@ function clipsForStreamerWhere(streamerId: string): SQL {
  * 스트리머 상세 패널용: 최근 일정·연결 클립·카운트 (Prisma `getStreamerDetail`과 동일 조건)
  */
 export async function getStreamerDetailBundle(streamerId: string) {
+  logTrace("streamer-detail.bundle", { streamerId })
   const sid = streamerId?.trim()
   if (!sid) {
     logApi("streamer-detail", { streamerId: "", skipped: true })

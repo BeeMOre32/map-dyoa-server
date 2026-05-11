@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm"
 import { db } from "../db"
 import { streamers } from "../db/schema"
 import { streamerServerSchema, type StreamerPayload } from "../lib/streamer-schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 function normalize(raw: unknown): StreamerPayload {
   return streamerServerSchema.parse(raw)
@@ -16,6 +16,7 @@ function profileImgValue(v: StreamerPayload): string | null {
 }
 
 export async function createStreamer(raw: unknown): Promise<{ id: string }> {
+  logTrace("streamers.create")
   const v = normalize(raw)
   const id = createId()
   await db.insert(streamers).values({
@@ -39,6 +40,7 @@ export async function updateStreamer(
   id: string,
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
+  logTrace("streamers.update", { id })
   const v = normalize(raw)
   const updated = await db
     .update(streamers)
@@ -66,6 +68,7 @@ export async function updateStreamer(
 }
 
 export async function deleteStreamer(id: string): Promise<boolean> {
+  logTrace("streamers.delete", { id })
   const trimmed = id?.trim()
   if (!trimmed) return false
   const removed = await db

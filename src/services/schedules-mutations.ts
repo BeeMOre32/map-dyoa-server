@@ -3,7 +3,7 @@ import { and, eq, notInArray } from "drizzle-orm"
 import { db } from "../db"
 import { scheduleParticipants, schedules } from "../db/schema"
 import { scheduleServerSchema, type SchedulePayload } from "../lib/schedule-schema"
-import { logSchedules } from "../lib/server-log"
+import { logSchedules, logTrace } from "../lib/server-log"
 
 function normalizePayload(raw: unknown): SchedulePayload {
   return scheduleServerSchema.parse(raw)
@@ -19,6 +19,7 @@ function gameIdFromPayload(v: SchedulePayload): string | null {
 }
 
 export async function createSchedule(raw: unknown): Promise<{ id: string }> {
+  logTrace("schedules.create")
   const v = normalizePayload(raw)
   const id = createId()
   const liveUrls = liveUrlsFromPayload(v)
@@ -61,6 +62,7 @@ export async function updateSchedule(
   scheduleId: string,
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
+  logTrace("schedules.update", { scheduleId })
   const v = normalizePayload(raw)
   const liveUrls = liveUrlsFromPayload(v)
   const gameId = gameIdFromPayload(v)
@@ -136,6 +138,7 @@ export async function updateSchedule(
 export async function deleteSchedule(
   scheduleId: string,
 ): Promise<boolean> {
+  logTrace("schedules.delete", { scheduleId })
   const trimmed = scheduleId?.trim()
   if (!trimmed) return false
 

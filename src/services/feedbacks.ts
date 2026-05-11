@@ -3,9 +3,12 @@ import { and, desc, eq } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "../db"
 import { feedbacks } from "../db/schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
+
+const feedbackTypeSchema = z.enum(["EDIT_REQUEST", "ERROR_REPORT"])
 
 const createFeedbackSchema = z.object({
+  type: feedbackTypeSchema.optional().default("EDIT_REQUEST"),
   streamerId: z.string().optional(),
   streamerName: z.string().optional(),
   category: z.string().min(1).max(100),
@@ -13,11 +16,13 @@ const createFeedbackSchema = z.object({
 })
 
 export async function listFeedbacks(opts?: { status?: string }) {
+  logTrace("feedbacks.list", { status: opts?.status })
   const status = opts?.status?.trim()
   const rows = await db.query.feedbacks.findMany({
     ...(status ? { where: (f, { eq }) => eq(f.status, status) } : {}),
     columns: {
       id: true,
+      type: true,
       status: true,
       category: true,
       streamerName: true,
@@ -31,11 +36,12 @@ export async function listFeedbacks(opts?: { status?: string }) {
 }
 
 export async function createFeedback(raw: unknown): Promise<{ id: string }> {
+  logTrace("feedbacks.create")
   const v = createFeedbackSchema.parse(raw)
   const id = createId()
   await db.insert(feedbacks).values({
     id,
-    type: "EDIT_REQUEST",
+    type: v.type,
     category: v.category.trim(),
     content: v.content.trim(),
     streamerId: v.streamerId?.trim() || null,
@@ -50,6 +56,7 @@ export async function updateFeedbackStatus(
   feedbackId: string,
   status: "REJECTED" | "RESOLVED",
 ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
+  logTrace("feedbacks.updateStatus", { feedbackId, status })
   const rows = await db
     .update(feedbacks)
     .set({
@@ -68,6 +75,7 @@ export async function updateFeedbackStatus(
 }
 
 export async function countPendingFeedbacks() {
+  logTrace("feedbacks.countPending")
   const rows = await db.query.feedbacks.findMany({
     columns: { id: true },
     where: (f, { eq }) => eq(f.status, "PENDING"),

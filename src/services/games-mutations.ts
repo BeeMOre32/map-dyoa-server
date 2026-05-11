@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm"
 import { z } from "zod"
 import { db } from "../db"
 import { games } from "../db/schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 const gamePayloadSchema = z.object({
   title: z.string().min(1).max(100),
@@ -19,6 +19,7 @@ function normalize(raw: unknown) {
 }
 
 export async function createGame(raw: unknown): Promise<{ id: string }> {
+  logTrace("games.create")
   const v = normalize(raw)
   const id = createId()
   await db.insert(games).values({
@@ -34,6 +35,7 @@ export async function updateGame(
   gameId: string,
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
+  logTrace("games.update", { gameId })
   const v = normalize(raw)
   const rows = await db
     .update(games)
@@ -53,6 +55,7 @@ export async function updateGame(
 }
 
 export async function deleteGame(gameId: string): Promise<boolean> {
+  logTrace("games.delete", { gameId })
   const trimmed = gameId?.trim()
   if (!trimmed) return false
   const rows = await db

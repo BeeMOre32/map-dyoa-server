@@ -1,7 +1,19 @@
-import { and, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm"
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  isNull,
+  lt,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm"
 import { db } from "../db"
 import { clips } from "../db/schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 export type ClipSortOption =
   | "newest"
@@ -14,33 +26,44 @@ function escapeLike(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_")
 }
 
-function clipFiltersSQL(opts: {
-  streamerId?: string
-  month?: string
-  q?: string
-}): SQL | undefined {
+/** 관계형 `findMany`의 `where(fields, …)` 첫 인자와 `clips` 테이블 공통으로 쓰는 컬럼만 */
+type ClipFilterColumns = {
+  id: typeof clips.id
+  title: typeof clips.title
+  clipDate: typeof clips.clipDate
+  createdAt: typeof clips.createdAt
+}
+
+/**
+ * 클립 목록 필터. 관계형 `findMany`의 `where` 콜백과 `select().from(clips).where(...)`에
+ * 동일한 컬럼 참조를 씀 (`where: 미리 만든 SQL`은 내부 별칭과 맞지 않아 월 구간 등에서 실패할 수 있음).
+ */
+function clipFilterSQLForTable(
+  opts: { streamerId?: string; month?: string; q?: string },
+  t: ClipFilterColumns,
+): SQL | undefined {
   const parts: SQL[] = []
   const sid = opts.streamerId?.trim()
   if (sid) {
     parts.push(
-      sql`${clips.id} IN (SELECT "clipId" FROM "ClipParticipant" WHERE "streamerId" = ${sid})`,
+      sql`${t.id} IN (SELECT "clipId" FROM "ClipParticipant" WHERE "streamerId" = ${sid})`,
     )
   }
   const month = opts.month?.trim()
-  if (month) {
-    const [y, m] = month.split("-").map(Number)
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    const y = Number(month.slice(0, 4))
+    const m = Number(month.slice(5, 7))
     if (Number.isFinite(y) && Number.isFinite(m) && m >= 1 && m <= 12) {
-      const start = new Date(y, m - 1, 1)
-      const end = new Date(y, m, 1)
+      // postgres.js: `gte(col, Date)` 바인딩 시 "Received an instance of Date" 오류가 날 수 있음.
+      // timestamp 컬럼은 문자열을 gte 인자로 쓰면 Drizzle 드라이버 매핑이 깨지므로, ISO 문자열을 sql 파라미터로만 넘김.
+      const startIso = new Date(y, m - 1, 1).toISOString()
+      const endIso = new Date(y, m, 1).toISOString()
       parts.push(
-        or(
-          and(sql`${clips.clipDate} >= ${start}`, sql`${clips.clipDate} < ${end}`),
-          and(
-            sql`${clips.clipDate} IS NULL`,
-            sql`${clips.createdAt} >= ${start}`,
-            sql`${clips.createdAt} < ${end}`,
-          ),
-        )!,
+        sql`(
+          (${t.clipDate} is not null and ${t.clipDate} >= ${startIso}::timestamptz and ${t.clipDate} < ${endIso}::timestamptz)
+          or
+          (${t.clipDate} is null and ${t.createdAt} >= ${startIso}::timestamptz and ${t.createdAt} < ${endIso}::timestamptz)
+        )`,
       )
     }
   }
@@ -49,8 +72,8 @@ function clipFiltersSQL(opts: {
     const pat = `%${escapeLike(q)}%`
     parts.push(
       or(
-        ilike(clips.title, pat),
-        sql`${clips.id} IN (
+        ilike(t.title, pat),
+        sql`${t.id} IN (
           SELECT cp."clipId" FROM "ClipParticipant" cp
           INNER JOIN "Streamer" s ON s.id = cp."streamerId"
           WHERE s."name" ILIKE ${pat}
@@ -72,19 +95,28 @@ export async function listClipsPaginated(args: {
   /** true면 참가자·스트리머만 조인하고 일정·게임은 제외 (`scheduleId`는 유지) */
   clipsOnly?: boolean
 }) {
+  logTrace("clips.list", {
+    page: args.page,
+    streamerId: args.streamerId,
+    month: args.month,
+    clipsOnly: args.clipsOnly,
+  })
   const page = Math.max(1, args.page ?? 1)
   const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 20))
   const sort: ClipSortOption = args.sort ?? "newest"
   const clipsOnly = Boolean(args.clipsOnly)
-  const wf = clipFiltersSQL({
+  const filterOpts = {
     streamerId: args.streamerId,
     month: args.month,
     q: args.q,
-  })
+  }
+  const wfSql = clipFilterSQLForTable(filterOpts, clips)
+  const clipWhere =
+    wfSql != null ? (c: ClipFilterColumns) => clipFilterSQLForTable(filterOpts, c)! : undefined
 
   const rows = clipsOnly
     ? await db.query.clips.findMany({
-        ...(wf ? { where: wf } : {}),
+        ...(clipWhere ? { where: clipWhere } : {}),
         orderBy: (c, { asc: a, desc: d }) =>
           sort === "title"
             ? [a(c.title)]
@@ -100,7 +132,7 @@ export async function listClipsPaginated(args: {
         with: { participants: { with: { streamer: true } } },
       })
     : await db.query.clips.findMany({
-        ...(wf ? { where: wf } : {}),
+        ...(clipWhere ? { where: clipWhere } : {}),
         orderBy: (c, { asc: a, desc: d }) =>
           sort === "title"
             ? [a(c.title)]
@@ -119,8 +151,8 @@ export async function listClipsPaginated(args: {
         },
       })
 
-  const totalRow = wf
-    ? await db.select({ c: count() }).from(clips).where(wf)
+  const totalRow = wfSql
+    ? await db.select({ c: count() }).from(clips).where(wfSql)
     : await db.select({ c: count() }).from(clips)
 
   const total = Number(totalRow[0]?.c ?? 0)
@@ -146,6 +178,7 @@ export async function listClipsByScheduleIdPaginated(args: {
   page?: number
   pageSize?: number
 }) {
+  logTrace("clips.bySchedule", { scheduleId: args.scheduleId, page: args.page })
   const sid = args.scheduleId?.trim()
   if (!sid) {
     logApi("clips", { byScheduleId: "", skipped: true })
@@ -182,6 +215,7 @@ export async function listClipsByScheduleIdPaginated(args: {
 }
 
 export async function getClipById(id: string) {
+  logTrace("clips.byId", { id })
   const row = await db.query.clips.findFirst({
     where: (c, { eq: eqFn }) => eqFn(c.id, id),
     with: {
@@ -194,6 +228,7 @@ export async function getClipById(id: string) {
 }
 
 export async function getClipMonths(): Promise<string[]> {
+  logTrace("clips.months")
   const rows = await db
     .select({
       clipDate: clips.clipDate,
@@ -205,6 +240,7 @@ export async function getClipMonths(): Promise<string[]> {
   const months = new Set<string>()
   for (const c of rows) {
     const d = new Date(c.clipDate ?? c.createdAt)
+    if (!Number.isFinite(d.getTime())) continue
     months.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`)
   }
   const list = Array.from(months).sort().reverse()

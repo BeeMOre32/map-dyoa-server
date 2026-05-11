@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm"
 import { db } from "../db"
 import { games } from "../db/schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 export async function listGamesWithScheduleCount() {
+  logTrace("games.list")
   const rows = await db
     .select({
       id: games.id,
@@ -28,6 +29,7 @@ export async function listGamesWithScheduleCount() {
 }
 
 export async function getGameById(id: string) {
+  logTrace("games.byId", { id })
   const row = await db.query.games.findFirst({
     where: (g, { eq }) => eq(g.id, id),
   })

@@ -1,9 +1,10 @@
 import { and, count, desc, eq } from "drizzle-orm"
 import { db } from "../db"
 import { clips, feedbacks, scheduleParticipants, schedules, streamers } from "../db/schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 export async function getAdminStats() {
+  logTrace("admin.stats")
   const [scheduleRows, clipRows, streamerRows, pendingRows] = await Promise.all([
     db.select({ c: count() }).from(schedules),
     db.select({ c: count() }).from(clips),
@@ -28,6 +29,7 @@ export async function getAdminStats() {
 }
 
 export async function getAdminClips() {
+  logTrace("admin.clips")
   const rows = await db.query.clips.findMany({
     orderBy: (c, { desc }) => [desc(c.createdAt)],
     with: {
@@ -45,6 +47,7 @@ export async function getAdminClips() {
 }
 
 export async function getAdminSchedules(args?: { from?: string; to?: string }) {
+  logTrace("admin.schedules", { from: args?.from, to: args?.to })
   const from = args?.from?.trim()
   const to = args?.to?.trim()
   const fromDate = from ? new Date(from) : null
@@ -86,6 +89,7 @@ export async function getAdminSchedules(args?: { from?: string; to?: string }) {
 }
 
 export async function getRecentActivity() {
+  logTrace("admin.recentActivity")
   const [scheduleRows, clipRows] = await Promise.all([
     db.query.schedules.findMany({
       orderBy: (s, { desc }) => [desc(s.createdAt)],
@@ -109,6 +113,7 @@ export async function getRecentActivity() {
 }
 
 export async function getHoi4Leaderboard() {
+  logTrace("admin.hoi4Leaderboard")
   const rows = await db.query.scheduleParticipants.findMany({
     where: (sp, { and, eq }) =>
       and(eq(sp.isGuest, false), eq((sp as any).schedule.isNaeJeon, true), eq((sp as any).schedule.game.isHoi4, true)),

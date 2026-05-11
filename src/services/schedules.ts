@@ -1,5 +1,5 @@
 import { db } from "../db"
-import { logSchedules } from "../lib/server-log"
+import { logSchedules, logTrace } from "../lib/server-log"
 import {
   flattenScheduleParticipants,
   flattenSchedules,
@@ -93,6 +93,12 @@ export function parseCalendarPeriod(
 export async function listSchedules(
   q: ListSchedulesQuery,
 ): Promise<ListSchedulesResult> {
+  logTrace("schedules.list", {
+    hasFromTo: Boolean(q.from?.trim() && q.to?.trim()),
+    hasPeriod: Boolean(q.period?.trim()),
+    year: q.year,
+    month: q.month,
+  })
   const fromStr = q.from?.trim()
   const toStr = q.to?.trim()
   const hasFromTo = Boolean(fromStr && toStr)
@@ -207,6 +213,7 @@ export async function listSchedules(
 export async function getScheduleById(
   id: string,
 ): Promise<FlattenedSchedule | null> {
+  logTrace("schedules.byId", { id })
   const row = await db.query.schedules.findFirst({
     where: (s, { eq: eqFn }) => eqFn(s.id, id),
     with: {

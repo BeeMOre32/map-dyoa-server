@@ -3,13 +3,14 @@ import { eq } from "drizzle-orm"
 import { db } from "../db"
 import { clipParticipants, clips } from "../db/schema"
 import { clipServerSchema, type ClipPayload } from "../lib/clip-schema"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 function normalize(raw: unknown): ClipPayload {
   return clipServerSchema.parse(raw)
 }
 
 export async function createClip(raw: unknown): Promise<{ id: string }> {
+  logTrace("clips.create")
   const v = normalize(raw)
   const id = createId()
 
@@ -41,6 +42,7 @@ export async function updateClip(
   clipId: string,
   raw: unknown,
 ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
+  logTrace("clips.update", { clipId })
   const v = normalize(raw)
 
   const result = await db.transaction(async (tx) => {
@@ -80,6 +82,7 @@ export async function updateClip(
 }
 
 export async function deleteClip(clipId: string): Promise<boolean> {
+  logTrace("clips.delete", { clipId })
   const trimmed = clipId?.trim()
   if (!trimmed) return false
   const removed = await db

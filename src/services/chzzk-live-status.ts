@@ -1,5 +1,5 @@
 import { db } from "../db"
-import { logApi } from "../lib/server-log"
+import { logApi, logTrace } from "../lib/server-log"
 
 const CHZZK_LIVE_DETAIL = "https://api.chzzk.naver.com/service/v2/channels"
 const CACHE_TTL_MS = 60_000
@@ -62,6 +62,7 @@ async function pullLiveStreamerIds(): Promise<string[]> {
 }
 
 export async function getLiveStreamerIds(): Promise<string[]> {
+  logTrace("chzzk.liveStatus")
   const now = Date.now()
   if (cache && now - cache.fetchedAt < CACHE_TTL_MS) {
     return cache.liveStreamerIds

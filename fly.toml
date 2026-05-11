@@ -2,6 +2,10 @@
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
+# Sentry: fly secrets set SENTRY_DSN="https://...@o....ingest.sentry.io/..."
+# 선택: SENTRY_ENVIRONMENT, SENTRY_RELEASE(git SHA), SENTRY_SEND_DEFAULT_PII=1
+# 트레이싱(Performance 쿼터): 기본 끔. 필요 시만 SENTRY_TRACES_SAMPLE_RATE=0.05 등
+#
 
 app = 'map-dyoa-server'
 primary_region = 'nrt'

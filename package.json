@@ -10,13 +10,15 @@
     "db:introspect": "drizzle-kit introspect",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "sentry:verify": "bun run scripts/sentry-verify.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.2",
     "@paralleldrive/cuid2": "^3.3.0",
+    "@sentry/elysia": "^10.52.0",
     "drizzle-orm": "^0.40.0",
-    "elysia": "^1.2.25",
+    "elysia": "^1.4.0",
     "postgres": "^3.4.5",
     "zod": "^4.4.3"
   },

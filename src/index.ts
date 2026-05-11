@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/elysia"
 import { Elysia } from "elysia"
 import { sql } from "drizzle-orm"
 import { db } from "./db"
@@ -11,10 +12,15 @@ import { clipsRoutes } from "./routes/clips"
 import { gamesRoutes } from "./routes/games"
 import { schedulesRoutes } from "./routes/schedules"
 import { streamersRoutes } from "./routes/streamers"
+import { initSentryFromEnv, sentryShouldCaptureElysiaError } from "./lib/sentry-init"
+
+initSentryFromEnv()
 
 const port = Number(process.env.PORT ?? 3001)
 
-const app = new Elysia()
+const app = Sentry.withElysia(new Elysia(), {
+  shouldHandleError: sentryShouldCaptureElysiaError,
+})
   .use(corsPlugin)
   .use(requestTracePlugin)
   .use(httpLogPlugin)
@@ -34,6 +40,14 @@ const app = new Elysia()
     return { ok: true as const, db: "up" as const }
   })
   .listen({ port, hostname: "0.0.0.0" })
+
+if (process.env.SENTRY_DSN?.trim()) {
+  const shutdown = () => {
+    void Sentry.flush(2000).finally(() => process.exit(0))
+  }
+  process.on("SIGTERM", shutdown)
+  process.on("SIGINT", shutdown)
+}
 
 console.log(
   `map-dyoa-server listening on http://${app.server?.hostname}:${app.server?.port}`,

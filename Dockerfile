@@ -13,9 +13,8 @@ ENV NODE_ENV=production
 # fly.toml internal_port 와 맞춤 (Fly 가 PORT 주입)
 ENV PORT=3000
 
-COPY package.json package-lock.json ./
-# npm lockfile 기준; 재현이 필요하면 로컬에서 `bun install` 후 bun.lockb 커밋하고 --frozen-lockfile 추가
-RUN bun install --production
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
 
 COPY . .
 

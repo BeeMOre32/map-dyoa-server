@@ -1,5 +1,6 @@
 import { Elysia, ValidationError } from "elysia"
 import { setRequestContext } from "../lib/request-context"
+import { logException, logHttp, logWarn } from "../lib/server-log"
 
 const REQUEST_ID_HEADER = "x-request-id"
 /** 클라이언트가 넘긴 ID는 짧은 ASCII만 허용 (헤더 주입 완화) */
@@ -17,6 +18,7 @@ export function readOrCreateRequestId(request: Request): string {
 export const requestTracePlugin = new Elysia({ name: "request-trace" })
   .derive(({ request }) => ({
     requestId: readOrCreateRequestId(request),
+    requestStartedAt: Date.now(),
   }))
   .onBeforeHandle(({ requestId }) => {
     setRequestContext(requestId)
@@ -24,14 +26,45 @@ export const requestTracePlugin = new Elysia({ name: "request-trace" })
   .onAfterHandle(({ requestId, set }) => {
     set.headers[REQUEST_ID_HEADER] = requestId
   })
-  .onError(({ request, error, code, set, requestId }) => {
+  .onError(({ request, error, code, set, requestId, requestStartedAt }) => {
     const rid = typeof requestId === "string" ? requestId : readOrCreateRequestId(request)
     set.headers[REQUEST_ID_HEADER] = rid
 
     const url = new URL(request.url)
     const path = `${url.pathname}${url.search}`
 
+    const started =
+      typeof requestStartedAt === "number" && Number.isFinite(requestStartedAt)
+        ? requestStartedAt
+        : Date.now()
+    const durationMs = Date.now() - started
+
+    let errorStatus: number
     if (code === "VALIDATION" && error instanceof ValidationError) {
+      errorStatus = error.status ?? 400
+    } else if (code === "NOT_FOUND") {
+      errorStatus = 404
+    } else if (code === "PARSE") {
+      errorStatus = 400
+    } else {
+      errorStatus = typeof set.status === "number" && set.status > 0 ? set.status : 500
+    }
+
+    const rawUa = request.headers.get("user-agent")
+    const userAgent =
+      rawUa && rawUa.length > 240 ? `${rawUa.slice(0, 240)}…` : rawUa ?? undefined
+
+    logHttp(request.method, url.pathname, url.search, errorStatus, durationMs, rid, {
+      elysiaCode: String(code),
+      ...(userAgent ? { userAgent } : {}),
+    })
+
+    if (code === "VALIDATION" && error instanceof ValidationError) {
+      const all = error.all
+      logWarn("validation_failed", {
+        path,
+        issueCount: Array.isArray(all) ? all.length : 0,
+      })
       set.status = error.status ?? 400
       return {
         ok: false as const,
@@ -43,6 +76,13 @@ export const requestTracePlugin = new Elysia({ name: "request-trace" })
           path,
         },
       }
+    }
+
+    if (errorStatus >= 500) {
+      logException("unhandled_request_error", error, {
+        elysiaCode: String(code),
+        path,
+      })
     }
 
     if (code === "NOT_FOUND") {

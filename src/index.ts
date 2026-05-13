@@ -12,6 +12,7 @@ import { clipsRoutes } from "./routes/clips"
 import { gamesRoutes } from "./routes/games"
 import { schedulesRoutes } from "./routes/schedules"
 import { streamersRoutes } from "./routes/streamers"
+import { logApi } from "./lib/server-log"
 import { initSentryFromEnv, sentryShouldCaptureElysiaError } from "./lib/sentry-init"
 
 initSentryFromEnv()
@@ -49,6 +50,8 @@ if (process.env.SENTRY_DSN?.trim()) {
   process.on("SIGINT", shutdown)
 }
 
-console.log(
-  `map-dyoa-server listening on http://${app.server?.hostname}:${app.server?.port}`,
-)
+logApi("boot", {
+  listen: true,
+  host: app.server?.hostname ?? "0.0.0.0",
+  port: Number(app.server?.port ?? port),
+})

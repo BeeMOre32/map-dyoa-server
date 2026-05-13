@@ -1,6 +1,6 @@
-import { and, count, desc, eq } from "drizzle-orm"
+import { and, count, desc, eq, inArray } from "drizzle-orm"
 import { db } from "../db"
-import { clips, feedbacks, scheduleParticipants, schedules, streamers } from "../db/schema"
+import { clips, feedbacks, games, scheduleParticipants, schedules, streamers } from "../db/schema"
 import { logApi, logTrace } from "../lib/server-log"
 
 export async function getAdminStats() {
@@ -114,9 +114,20 @@ export async function getRecentActivity() {
 
 export async function getHoi4Leaderboard() {
   logTrace("admin.hoi4Leaderboard")
+  const hoi4NaeJeonSchedules = await db
+    .select({ id: schedules.id })
+    .from(schedules)
+    .innerJoin(games, eq(schedules.gameId, games.id))
+    .where(and(eq(schedules.isNaeJeon, true), eq(games.isHoi4, true)))
+
+  const scheduleIds = hoi4NaeJeonSchedules.map((r) => r.id)
+  if (scheduleIds.length === 0) {
+    logApi("admin", { hoi4Rows: 0, sessions: 0, leaderboard: 0 })
+    return { leaderboard: [], sessions: [], totalSessions: 0 }
+  }
+
   const rows = await db.query.scheduleParticipants.findMany({
-    where: (sp, { and, eq }) =>
-      and(eq(sp.isGuest, false), eq((sp as any).schedule.isNaeJeon, true), eq((sp as any).schedule.game.isHoi4, true)),
+    where: (sp, { and, eq }) => and(eq(sp.isGuest, false), inArray(sp.scheduleId, scheduleIds)),
     with: {
       streamer: { columns: { id: true, name: true, colorCode: true } },
       schedule: {
@@ -124,8 +135,13 @@ export async function getHoi4Leaderboard() {
         with: { game: { columns: { title: true } } },
       },
     },
-    orderBy: (sp, { desc }) => [desc((sp as any).schedule.startTime)],
   })
+
+  rows.sort(
+    (a, b) =>
+      new Date(b.schedule?.startTime ?? 0).getTime() -
+      new Date(a.schedule?.startTime ?? 0).getTime(),
+  )
 
   type StatEntry = {
     streamer: { id: string; name: string; colorCode: string }

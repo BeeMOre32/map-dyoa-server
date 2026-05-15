@@ -1,6 +1,7 @@
 import { Elysia, t } from "elysia"
 import { ZodError } from "zod"
 import { pgCode } from "../lib/pg-error"
+import { bulkCreateStreamers } from "../services/streamers-bulk"
 import {
   createStreamer,
   deleteStreamer,
@@ -21,6 +22,31 @@ export const streamersRoutes = new Elysia({ prefix: "/streamers" })
     {
       query: t.Object({
         membersOnly: t.Optional(t.String()),
+      }),
+    },
+  )
+  .post(
+    "/bulk",
+    async ({ body, set }) => {
+      try {
+        const list = Array.isArray((body as { streamers?: unknown })?.streamers)
+          ? (body as { streamers: unknown[] }).streamers
+          : body
+        const { created } = await bulkCreateStreamers(list)
+        set.status = 201
+        return { created }
+      } catch (e) {
+        if (e instanceof ZodError) {
+          set.status = 400
+          return { error: "VALIDATION" as const, issues: e.flatten() }
+        }
+        set.status = 500
+        return { error: "INTERNAL" as const }
+      }
+    },
+    {
+      body: t.Object({
+        streamers: t.Array(t.Any()),
       }),
     },
   )

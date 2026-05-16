@@ -4,7 +4,7 @@ import { z } from "zod"
 const participant = z.object({
   id: z.string(),
   nation: z.string().optional(),
-  result: z.string().optional(),
+  result: z.string().nullable().optional(),
   isGuest: z.boolean().optional(),
 })
 

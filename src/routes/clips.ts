@@ -32,10 +32,14 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
       const pageSize = query.pageSize ? Number(query.pageSize) : 20
       const clipsOnly =
         query.clipsOnly === "1" || query.clipsOnly === "true"
+      const streamerIds = query.streamers
+        ? query.streamers.split(",").map((s) => s.trim()).filter(Boolean)
+        : undefined
       return listClipsPaginated({
         page: Number.isFinite(page) ? page : 1,
         pageSize: Number.isFinite(pageSize) ? pageSize : 20,
-        streamerId: query.streamer,
+        streamerId: streamerIds?.length === 1 ? streamerIds[0] : query.streamer,
+        streamerIds: streamerIds && streamerIds.length > 1 ? streamerIds : undefined,
         month: query.month,
         q: query.q,
         sort,
@@ -47,6 +51,7 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
         page: t.Optional(t.String()),
         pageSize: t.Optional(t.String()),
         streamer: t.Optional(t.String()),
+        streamers: t.Optional(t.String()),
         month: t.Optional(t.String()),
         q: t.Optional(t.String()),
         sort: t.Optional(t.String()),

@@ -39,14 +39,28 @@ type ClipFilterColumns = {
  * 동일한 컬럼 참조를 씀 (`where: 미리 만든 SQL`은 내부 별칭과 맞지 않아 월 구간 등에서 실패할 수 있음).
  */
 function clipFilterSQLForTable(
-  opts: { streamerId?: string; month?: string; q?: string },
+  opts: {
+    streamerId?: string
+    streamerIds?: string[]
+    month?: string
+    q?: string
+  },
   t: ClipFilterColumns,
 ): SQL | undefined {
   const parts: SQL[] = []
-  const sid = opts.streamerId?.trim()
-  if (sid) {
+  const ids =
+    opts.streamerIds?.map((id) => id.trim()).filter(Boolean) ??
+    (opts.streamerId?.trim() ? [opts.streamerId.trim()] : [])
+  if (ids.length === 1) {
     parts.push(
-      sql`${t.id} IN (SELECT "clipId" FROM "ClipParticipant" WHERE "streamerId" = ${sid})`,
+      sql`${t.id} IN (SELECT "clipId" FROM "ClipParticipant" WHERE "streamerId" = ${ids[0]})`,
+    )
+  } else if (ids.length > 1) {
+    parts.push(
+      sql`${t.id} IN (SELECT "clipId" FROM "ClipParticipant" WHERE "streamerId" IN (${sql.join(
+        ids.map((id) => sql`${id}`),
+        sql`, `,
+      )}))`,
     )
   }
   const month = opts.month?.trim()
@@ -89,6 +103,7 @@ export async function listClipsPaginated(args: {
   page?: number
   pageSize?: number
   streamerId?: string
+  streamerIds?: string[]
   month?: string
   q?: string
   sort?: ClipSortOption
@@ -107,6 +122,7 @@ export async function listClipsPaginated(args: {
   const clipsOnly = Boolean(args.clipsOnly)
   const filterOpts = {
     streamerId: args.streamerId,
+    streamerIds: args.streamerIds,
     month: args.month,
     q: args.q,
   }

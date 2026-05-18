@@ -84,12 +84,14 @@ export async function getChzzkLiveMetaFromUrl(url: string) {
   const matched = streamers.find((s) => s.chzzkUrl?.includes(channelId))
   logApi("chzzk-meta", { liveMeta: true, channelId, matched: Boolean(matched) })
 
+  const liveTitle = json?.content?.liveTitle?.trim()
   return {
     ok: true as const,
     data: {
-      title: json?.content?.liveTitle ?? null,
-      category: json?.content?.liveCategory ?? null,
-      channelName: json?.content?.channel?.channelName ?? null,
+      /** React controlled input 호환: null 대신 빈 문자열 */
+      title: liveTitle || "",
+      category: json?.content?.liveCategory?.trim() || "",
+      channelName: json?.content?.channel?.channelName?.trim() || "",
       matchedStreamerId: matched?.id ?? null,
       matchedStreamerName: matched?.name ?? null,
     },
@@ -126,7 +128,7 @@ export async function getChzzkClipMetaFromUrl(url: string) {
   }
   const videoId = playInfo?.content?.videoId ?? null
   const inKey = playInfo?.content?.inKey ?? null
-  const title = playInfo?.content?.contentTitle ?? null
+  const title = playInfo?.content?.contentTitle?.trim() || ""
   if (!videoId || !inKey) {
     return {
       ok: false as const,

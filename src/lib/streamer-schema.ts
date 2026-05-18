@@ -19,7 +19,20 @@ export const streamerServerSchema = z.object({
   ),
   youtubeUrl: z.preprocess(
     (val) => (typeof val === "string" && !val.trim() ? undefined : val),
-    z.string().url("유튜브 주소는 https:// 로 시작하는 URL이어야 합니다.").optional(),
+    z
+      .string()
+      .refine(
+        (s) => {
+          try {
+            const u = new URL(s)
+            return u.protocol === "http:" || u.protocol === "https:"
+          } catch {
+            return false
+          }
+        },
+        { message: "유튜브 주소는 https:// 로 시작하는 올바른 URL이어야 합니다." },
+      )
+      .optional(),
   ),
   bio: z.string().optional(),
   isGuest: z.boolean().optional(),

@@ -1,6 +1,5 @@
 import { Elysia, t } from "elysia"
-import { ZodError } from "zod"
-import { pgCode } from "../lib/pg-error"
+import { mutationErrorResponse } from "../lib/route-error"
 import { bulkCreateStreamers } from "../services/streamers-bulk"
 import {
   createStreamer,
@@ -36,12 +35,10 @@ export const streamersRoutes = new Elysia({ prefix: "/streamers" })
         set.status = 201
         return { created }
       } catch (e) {
-        if (e instanceof ZodError) {
-          set.status = 400
-          return { error: "VALIDATION" as const, issues: e.flatten() }
-        }
-        set.status = 500
-        return { error: "INTERNAL" as const }
+        return mutationErrorResponse(e, set, {
+          scope: "streamers.bulk",
+          duplicateMessage: "이미 사용 중인 이름 또는 핸들입니다.",
+        })
       }
     },
     {
@@ -56,23 +53,10 @@ export const streamersRoutes = new Elysia({ prefix: "/streamers" })
       set.status = 201
       return { id }
     } catch (e) {
-      if (e instanceof ZodError) {
-        set.status = 400
-        return { error: "VALIDATION" as const, issues: e.flatten() }
-      }
-      if (pgCode(e) === "23505") {
-        set.status = 409
-        return {
-          error: "DUPLICATE_ENTRY" as const,
-          message: "이미 사용 중인 이름 또는 핸들입니다.",
-        }
-      }
-      if (pgCode(e) === "23503") {
-        set.status = 400
-        return { error: "FK_VIOLATION" as const }
-      }
-      set.status = 500
-      return { error: "INTERNAL" as const }
+      return mutationErrorResponse(e, set, {
+        scope: "streamers.create",
+        duplicateMessage: "이미 사용 중인 이름 또는 핸들입니다.",
+      })
     }
   })
   .patch("/:id", async ({ params, body, set }) => {
@@ -84,19 +68,10 @@ export const streamersRoutes = new Elysia({ prefix: "/streamers" })
       }
       return { ok: true as const }
     } catch (e) {
-      if (e instanceof ZodError) {
-        set.status = 400
-        return { error: "VALIDATION" as const, issues: e.flatten() }
-      }
-      if (pgCode(e) === "23505") {
-        set.status = 409
-        return {
-          error: "DUPLICATE_ENTRY" as const,
-          message: "이미 사용 중인 이름 또는 핸들입니다.",
-        }
-      }
-      set.status = 500
-      return { error: "INTERNAL" as const }
+      return mutationErrorResponse(e, set, {
+        scope: "streamers.update",
+        duplicateMessage: "이미 사용 중인 이름 또는 핸들입니다.",
+      })
     }
   })
   .delete("/:id", async ({ params, set }) => {

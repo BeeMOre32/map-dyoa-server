@@ -1,6 +1,15 @@
 import { getRequestId } from "./request-context"
 
-export type LogFields = Record<string, string | number | boolean | undefined | null>
+export type LogFieldValue =
+  | string
+  | number
+  | boolean
+  | undefined
+  | null
+  | string[]
+  | number[]
+
+export type LogFields = Record<string, LogFieldValue>
 
 const MAX_STACK = 12_000
 

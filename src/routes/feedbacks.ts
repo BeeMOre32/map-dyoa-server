@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia"
-import { ZodError } from "zod"
+import { mutationErrorResponse } from "../lib/route-error"
 import {
   createFeedback,
   listFeedbacks,
@@ -25,12 +25,7 @@ export const feedbacksRoutes = new Elysia({ prefix: "/feedbacks" })
       set.status = 201
       return { id }
     } catch (e) {
-      if (e instanceof ZodError) {
-        set.status = 400
-        return { error: "VALIDATION" as const, issues: e.flatten() }
-      }
-      set.status = 500
-      return { error: "INTERNAL" as const }
+      return mutationErrorResponse(e, set, { scope: "feedbacks.create" })
     }
   })
   .patch("/:id/reject", async ({ params, set }) => {

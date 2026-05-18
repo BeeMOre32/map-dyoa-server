@@ -1,6 +1,8 @@
 import { Elysia, ValidationError } from "elysia"
+import { truncateJson } from "../lib/http-request-log"
+import { pgErrorFields } from "../lib/pg-error"
 import { setRequestContext } from "../lib/request-context"
-import { logException, logHttp, logWarn } from "../lib/server-log"
+import { logException, logWarn } from "../lib/server-log"
 
 const REQUEST_ID_HEADER = "x-request-id"
 /** 클라이언트가 넘긴 ID는 짧은 ASCII만 허용 (헤더 주입 완화) */
@@ -33,12 +35,6 @@ export const requestTracePlugin = new Elysia({ name: "request-trace" })
     const url = new URL(request.url)
     const path = `${url.pathname}${url.search}`
 
-    const started =
-      typeof requestStartedAt === "number" && Number.isFinite(requestStartedAt)
-        ? requestStartedAt
-        : Date.now()
-    const durationMs = Date.now() - started
-
     let errorStatus: number
     if (code === "VALIDATION" && error instanceof ValidationError) {
       errorStatus = error.status ?? 400
@@ -50,20 +46,13 @@ export const requestTracePlugin = new Elysia({ name: "request-trace" })
       errorStatus = typeof set.status === "number" && set.status > 0 ? set.status : 500
     }
 
-    const rawUa = request.headers.get("user-agent")
-    const userAgent =
-      rawUa && rawUa.length > 240 ? `${rawUa.slice(0, 240)}…` : rawUa ?? undefined
-
-    logHttp(request.method, url.pathname, url.search, errorStatus, durationMs, rid, {
-      elysiaCode: String(code),
-      ...(userAgent ? { userAgent } : {}),
-    })
-
     if (code === "VALIDATION" && error instanceof ValidationError) {
       const all = error.all
       logWarn("validation_failed", {
         path,
+        elysiaCode: String(code),
         issueCount: Array.isArray(all) ? all.length : 0,
+        validationJson: truncateJson(all),
       })
       set.status = error.status ?? 400
       return {
@@ -82,6 +71,8 @@ export const requestTracePlugin = new Elysia({ name: "request-trace" })
       logException("unhandled_request_error", error, {
         elysiaCode: String(code),
         path,
+        handled: false,
+        ...pgErrorFields(error),
       })
     }
 

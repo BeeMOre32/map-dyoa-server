@@ -1,6 +1,5 @@
 import { Elysia, t } from "elysia"
-import { ZodError } from "zod"
-import { pgCode } from "../lib/pg-error"
+import { mutationErrorResponse } from "../lib/route-error"
 import { createClip, deleteClip, updateClip } from "../services/clips-mutations"
 import {
   getClipById,
@@ -65,19 +64,10 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
       set.status = 201
       return { id }
     } catch (e) {
-      if (e instanceof ZodError) {
-        set.status = 400
-        return { error: "VALIDATION" as const, issues: e.flatten() }
-      }
-      if (pgCode(e) === "23503") {
-        set.status = 400
-        return {
-          error: "FK_VIOLATION" as const,
-          message: "존재하지 않는 스트리머 또는 일정 참조입니다.",
-        }
-      }
-      set.status = 500
-      return { error: "INTERNAL" as const }
+      return mutationErrorResponse(e, set, {
+        scope: "clips.create",
+        fkMessage: "존재하지 않는 스트리머 또는 일정 참조입니다.",
+      })
     }
   })
   .patch("/:id", async ({ params, body, set }) => {
@@ -89,19 +79,10 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
       }
       return { ok: true as const }
     } catch (e) {
-      if (e instanceof ZodError) {
-        set.status = 400
-        return { error: "VALIDATION" as const, issues: e.flatten() }
-      }
-      if (pgCode(e) === "23503") {
-        set.status = 400
-        return {
-          error: "FK_VIOLATION" as const,
-          message: "존재하지 않는 스트리머 또는 일정 참조입니다.",
-        }
-      }
-      set.status = 500
-      return { error: "INTERNAL" as const }
+      return mutationErrorResponse(e, set, {
+        scope: "clips.update",
+        fkMessage: "존재하지 않는 스트리머 또는 일정 참조입니다.",
+      })
     }
   })
   .delete("/:id", async ({ params, set }) => {

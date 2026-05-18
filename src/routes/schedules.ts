@@ -1,6 +1,5 @@
 import { Elysia, t } from "elysia"
-import { ZodError } from "zod"
-import { pgCode } from "../lib/pg-error"
+import { mutationErrorResponse } from "../lib/route-error"
 import { logSchedules } from "../lib/server-log"
 import { listClipsByScheduleIdPaginated } from "../services/clips"
 import { createSchedule, deleteSchedule, updateSchedule } from "../services/schedules-mutations"
@@ -44,19 +43,10 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
       set.status = 201
       return { id }
     } catch (e) {
-      if (e instanceof ZodError) {
-        set.status = 400
-        return { error: "VALIDATION" as const, issues: e.flatten() }
-      }
-      if (pgCode(e) === "23503") {
-        set.status = 400
-        return {
-          error: "FK_VIOLATION" as const,
-          message: "존재하지 않는 게임 또는 스트리머 참조입니다.",
-        }
-      }
-      set.status = 500
-      return { error: "INTERNAL" as const }
+      return mutationErrorResponse(e, set, {
+        scope: "schedules.create",
+        fkMessage: "존재하지 않는 게임 또는 스트리머 참조입니다.",
+      })
     }
   })
   .patch("/:id", async ({ params, body, set }) => {
@@ -68,19 +58,10 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
       }
       return { ok: true as const }
     } catch (e) {
-      if (e instanceof ZodError) {
-        set.status = 400
-        return { error: "VALIDATION" as const, issues: e.flatten() }
-      }
-      if (pgCode(e) === "23503") {
-        set.status = 400
-        return {
-          error: "FK_VIOLATION" as const,
-          message: "존재하지 않는 게임 또는 스트리머 참조입니다.",
-        }
-      }
-      set.status = 500
-      return { error: "INTERNAL" as const }
+      return mutationErrorResponse(e, set, {
+        scope: "schedules.update",
+        fkMessage: "존재하지 않는 게임 또는 스트리머 참조입니다.",
+      })
     }
   })
   .delete("/:id", async ({ params, set }) => {

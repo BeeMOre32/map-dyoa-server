@@ -106,7 +106,7 @@ export function flattenScheduleParticipants(
   const start = new Date(schedule.startTime)
   return {
     id: schedule.id,
-    title: schedule.title,
+    title: schedule.title ?? "",
     content: schedule.content,
     gameId: schedule.gameId,
     game: schedule.game,

@@ -9,7 +9,10 @@ const participant = z.object({
 })
 
 export const scheduleServerSchema = z.object({
-  title: z.string().min(1, "방송 제목을 입력해주세요."),
+  title: z.preprocess(
+    (v) => (v === null || v === undefined ? "" : v),
+    z.string().min(1, "방송 제목을 입력해주세요."),
+  ),
   startTime: z.coerce
     .date()
     .refine((d) => !Number.isNaN(d.getTime()), "올바른 시간을 입력해주세요."),

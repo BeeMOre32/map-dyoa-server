@@ -1,4 +1,5 @@
 import { Elysia, t } from "elysia"
+import { logWarn } from "../lib/server-log"
 import { getLiveStreamerIds } from "../services/chzzk-live-status"
 import { getChzzkClipMetaFromUrl, getChzzkLiveMetaFromUrl } from "../services/chzzk-meta"
 
@@ -17,7 +18,15 @@ export const chzzkRoutes = new Elysia({ prefix: "/chzzk" })
       }
       const r = await getChzzkLiveMetaFromUrl(url)
       if (!r.ok) {
-        set.status = (r as { status?: number }).status ?? 400
+        const status = (r as { status?: number }).status ?? 400
+        set.status = status
+        if (status >= 500) {
+          logWarn("chzzk.live_meta_failed", {
+            status,
+            code: "code" in r ? String(r.code) : undefined,
+            message: r.message,
+          })
+        }
         return { error: r.message }
       }
       return r.data
@@ -34,7 +43,15 @@ export const chzzkRoutes = new Elysia({ prefix: "/chzzk" })
       }
       const r = await getChzzkClipMetaFromUrl(url)
       if (!r.ok) {
-        set.status = r.status ?? 400
+        const status = r.status ?? 400
+        set.status = status
+        if (status >= 500) {
+          logWarn("chzzk.clip_meta_failed", {
+            status,
+            code: "code" in r ? String(r.code) : undefined,
+            message: r.message,
+          })
+        }
         return { error: r.message }
       }
       return r.data

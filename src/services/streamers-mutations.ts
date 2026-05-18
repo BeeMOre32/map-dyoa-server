@@ -29,6 +29,7 @@ export async function createStreamer(raw: unknown): Promise<{ id: string }> {
     profileImg: profileImgValue(v),
     colorCode: v.colorCode,
     chzzkUrl: v.chzzkUrl?.trim() || null,
+    youtubeUrl: v.youtubeUrl?.trim() || null,
     bio: v.bio?.trim() || null,
     isGuest: v.isGuest ?? false,
   })
@@ -53,6 +54,7 @@ export async function updateStreamer(
       profileImg: profileImgValue(v),
       colorCode: v.colorCode,
       chzzkUrl: v.chzzkUrl?.trim() || null,
+      youtubeUrl: v.youtubeUrl?.trim() || null,
       bio: v.bio?.trim() || null,
       isGuest: v.isGuest ?? false,
     })

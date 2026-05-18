@@ -26,6 +26,7 @@ export const streamers = pgTable("Streamer", {
   profileImg: text("profileImg"),
   colorCode: text("colorCode").notNull().default("#673AB7"),
   chzzkUrl: text("chzzkUrl"),
+  youtubeUrl: text("youtubeUrl"),
   bio: text("bio"),
   isGuest: boolean("isGuest").notNull().default(false),
   createdAt: timestamp("createdAt", { precision: 3, withTimezone: true })

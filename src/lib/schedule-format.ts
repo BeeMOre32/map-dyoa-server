@@ -18,6 +18,7 @@ export type StreamerDto = {
   profileImg: string | null
   colorCode: string
   chzzkUrl: string | null
+  youtubeUrl: string | null
   bio: string | null
   isGuest: boolean
   createdAt: Date
@@ -57,6 +58,7 @@ type StreamerRow = {
   profileImg: string | null
   colorCode: string
   chzzkUrl: string | null
+  youtubeUrl: string | null
   bio: string | null
   isGuest: boolean
   createdAt: Date
@@ -129,6 +131,7 @@ export function flattenScheduleParticipants(
           profileImg: s.profileImg,
           colorCode: s.colorCode,
           chzzkUrl: s.chzzkUrl,
+          youtubeUrl: s.youtubeUrl,
           bio: s.bio,
           isGuest: p.isGuest,
           createdAt: new Date(s.createdAt),

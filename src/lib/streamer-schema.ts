@@ -13,7 +13,14 @@ export const streamerServerSchema = z.object({
   platform: z.string().default("CHZZK"),
   profileImg: z.string().trim().url().optional().or(z.literal("")),
   colorCode: z.string().default("#673AB7"),
-  chzzkUrl: z.string().optional(),
+  chzzkUrl: z.preprocess(
+    (val) => (typeof val === "string" && !val.trim() ? undefined : val),
+    z.string().optional(),
+  ),
+  youtubeUrl: z.preprocess(
+    (val) => (typeof val === "string" && !val.trim() ? undefined : val),
+    z.string().url("유튜브 주소는 https:// 로 시작하는 URL이어야 합니다.").optional(),
+  ),
   bio: z.string().optional(),
   isGuest: z.boolean().optional(),
 })

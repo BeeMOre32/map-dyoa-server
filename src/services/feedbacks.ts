@@ -39,6 +39,7 @@ export async function createFeedback(raw: unknown): Promise<{ id: string }> {
   logTrace("feedbacks.create")
   const v = createFeedbackSchema.parse(raw)
   const id = createId()
+  const now = new Date()
   await db.insert(feedbacks).values({
     id,
     type: v.type,
@@ -47,6 +48,8 @@ export async function createFeedback(raw: unknown): Promise<{ id: string }> {
     streamerId: v.streamerId?.trim() || null,
     streamerName: v.streamerName?.trim() || null,
     status: "PENDING",
+    createdAt: now,
+    updatedAt: now,
   })
   logApi("feedbacks", { create: id })
   return { id }

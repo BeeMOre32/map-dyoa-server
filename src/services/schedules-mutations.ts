@@ -2,11 +2,23 @@ import { createId } from "@paralleldrive/cuid2"
 import { and, eq, notInArray } from "drizzle-orm"
 import { db } from "../db"
 import { scheduleParticipants, schedules } from "../db/schema"
-import { scheduleServerSchema, type SchedulePayload } from "../lib/schedule-schema"
+import {
+  scheduleServerSchema,
+  scheduleUpdateSchema,
+  type SchedulePayload,
+  type ScheduleUpdatePayload,
+} from "../lib/schedule-schema"
 import { logSchedules, logTrace } from "../lib/server-log"
 
-function normalizePayload(raw: unknown): SchedulePayload {
+const SCHEDULE_CONFLICT_MESSAGE =
+  "다른 관리자가 먼저 수정했습니다. 새로고침 후 다시 시도해주세요."
+
+function normalizeCreatePayload(raw: unknown): SchedulePayload {
   return scheduleServerSchema.parse(raw)
+}
+
+function normalizeUpdatePayload(raw: unknown): ScheduleUpdatePayload {
+  return scheduleUpdateSchema.parse(raw)
 }
 
 function liveUrlsFromPayload(v: SchedulePayload): string[] {
@@ -20,10 +32,11 @@ function gameIdFromPayload(v: SchedulePayload): string | null {
 
 export async function createSchedule(raw: unknown): Promise<{ id: string }> {
   logTrace("schedules.create")
-  const v = normalizePayload(raw)
+  const v = normalizeCreatePayload(raw)
   const id = createId()
   const liveUrls = liveUrlsFromPayload(v)
   const gameId = gameIdFromPayload(v)
+  const now = new Date()
 
   await db.transaction(async (tx) => {
     await tx.insert(schedules).values({
@@ -37,6 +50,7 @@ export async function createSchedule(raw: unknown): Promise<{ id: string }> {
       isLiveEnded: false,
       liveUrls,
       gameId,
+      updatedAt: now,
     })
 
     await tx.insert(scheduleParticipants).values(
@@ -61,14 +75,24 @@ export async function createSchedule(raw: unknown): Promise<{ id: string }> {
 export async function updateSchedule(
   scheduleId: string,
   raw: unknown,
-): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
+): Promise<
+  { ok: true } | { ok: false; reason: "NOT_FOUND" | "CONFLICT"; message?: string }
+> {
   logTrace("schedules.update", { scheduleId })
-  const v = normalizePayload(raw)
+  const v = normalizeUpdatePayload(raw)
   const liveUrls = liveUrlsFromPayload(v)
   const gameId = gameIdFromPayload(v)
   const streamerIds = v.participants.map((p) => p.id)
+  const now = new Date()
 
   const result = await db.transaction(async (tx) => {
+    const whereClause = v.expectedUpdatedAt
+      ? and(
+          eq(schedules.id, scheduleId),
+          eq(schedules.updatedAt, v.expectedUpdatedAt),
+        )
+      : eq(schedules.id, scheduleId)
+
     const updated = await tx
       .update(schedules)
       .set({
@@ -79,12 +103,19 @@ export async function updateSchedule(
         isGuerrilla: v.isGuerrilla ?? false,
         isNaeJeon: v.isNaeJeon ?? false,
         isLiveEnded: v.isLiveEnded ?? false,
+        updatedAt: now,
       })
-      .where(eq(schedules.id, scheduleId))
+      .where(whereClause)
       .returning({ id: schedules.id })
 
     if (updated.length === 0) {
-      return false
+      const exists = await tx.query.schedules.findFirst({
+        where: eq(schedules.id, scheduleId),
+        columns: { id: true },
+      })
+      if (!exists) return { status: "NOT_FOUND" as const }
+      if (v.expectedUpdatedAt) return { status: "CONFLICT" as const }
+      return { status: "NOT_FOUND" as const }
     }
 
     await tx
@@ -104,7 +135,7 @@ export async function updateSchedule(
           scheduleId,
           streamerId: p.id,
           nation: p.nation?.trim() || null,
-          result: p.result || null,
+          result: p.result ?? null,
           isGuest: p.isGuest ?? false,
         })
         .onConflictDoUpdate({
@@ -114,19 +145,24 @@ export async function updateSchedule(
           ],
           set: {
             nation: p.nation?.trim() || null,
-            result: p.result || null,
+            result: p.result ?? null,
             isGuest: p.isGuest ?? false,
           },
         })
     }
 
-    return true
+    return { status: "OK" as const }
   })
 
-  if (!result) {
+  if (result.status === "NOT_FOUND") {
     logSchedules("update", { id: scheduleId, ok: false, reason: "NOT_FOUND" })
     return { ok: false, reason: "NOT_FOUND" }
   }
+  if (result.status === "CONFLICT") {
+    logSchedules("update", { id: scheduleId, ok: false, reason: "CONFLICT" })
+    return { ok: false, reason: "CONFLICT", message: SCHEDULE_CONFLICT_MESSAGE }
+  }
+
   logSchedules("update", {
     id: scheduleId,
     ok: true,

@@ -26,4 +26,10 @@ export const scheduleServerSchema = z.object({
   isLiveEnded: z.boolean().optional(),
 })
 
+/** PATCH 전용 — 낙관적 동시성 revision */
+export const scheduleUpdateSchema = scheduleServerSchema.extend({
+  expectedUpdatedAt: z.coerce.date().optional(),
+})
+
 export type SchedulePayload = z.infer<typeof scheduleServerSchema>
+export type ScheduleUpdatePayload = z.infer<typeof scheduleUpdateSchema>

@@ -68,6 +68,9 @@ export const schedules = pgTable(
     createdAt: timestamp("createdAt", { precision: 3, withTimezone: true })
       .notNull()
       .defaultNow(),
+    updatedAt: timestamp("updatedAt", { precision: 3, withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
 );
 

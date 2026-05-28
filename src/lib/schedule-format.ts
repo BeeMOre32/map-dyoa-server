@@ -43,6 +43,7 @@ export type FlattenedSchedule = {
   startTime: Date
   endTime: Date | null
   createdAt: Date
+  updatedAt: Date
   participants: ParticipantFlat[]
   formattedDate: string
   formattedTime: string
@@ -76,6 +77,7 @@ export type ScheduleWithRelations = {
   liveUrls: string[]
   gameId: string | null
   createdAt: Date
+  updatedAt: Date
   game: GameDto | null
   participants: Array<{
     nation: string | null
@@ -117,6 +119,7 @@ export function flattenScheduleParticipants(
     startTime: start,
     endTime: schedule.endTime ? new Date(schedule.endTime) : null,
     createdAt: new Date(schedule.createdAt),
+    updatedAt: new Date(schedule.updatedAt ?? schedule.createdAt),
     participants: schedule.participants
       .filter((p) => p.streamer != null)
       .map((p) => {

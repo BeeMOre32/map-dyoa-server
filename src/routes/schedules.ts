@@ -53,6 +53,13 @@ export const schedulesRoutes = new Elysia({ prefix: "/schedules" })
     try {
       const r = await updateSchedule(params.id, body)
       if (!r.ok) {
+        if (r.reason === "CONFLICT") {
+          set.status = 409
+          return {
+            error: "CONFLICT" as const,
+            message: r.message ?? "다른 관리자가 먼저 수정했습니다. 새로고침 후 다시 시도해주세요.",
+          }
+        }
         set.status = 404
         return { error: "NOT_FOUND" as const }
       }

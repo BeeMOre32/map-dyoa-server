@@ -127,7 +127,7 @@ export async function getHoi4Leaderboard() {
   }
 
   const rows = await db.query.scheduleParticipants.findMany({
-    where: (sp, { and, eq }) => and(eq(sp.isGuest, false), inArray(sp.scheduleId, scheduleIds)),
+    where: (sp, { inArray }) => inArray(sp.scheduleId, scheduleIds),
     with: {
       streamer: { columns: { id: true, name: true, colorCode: true } },
       schedule: {
@@ -186,7 +186,6 @@ export async function getHoi4Leaderboard() {
   const leaderboard = Array.from(statsMap.values()).sort((a, b) => b.total - a.total)
   const sessions = Array.from(sessionMap.values())
     .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-    .slice(0, 8)
     .map((s) => ({
       ...s,
       participants: [...s.participants].sort((a, b) =>
@@ -194,6 +193,11 @@ export async function getHoi4Leaderboard() {
       ),
     }))
 
-  logApi("admin", { hoi4Rows: rows.length, sessions: sessions.length, leaderboard: leaderboard.length })
+  logApi("admin", {
+    hoi4Rows: rows.length,
+    sessions: sessions.length,
+    leaderboard: leaderboard.length,
+    totalSessions: sessionMap.size,
+  })
   return { leaderboard, sessions, totalSessions: sessionMap.size }
 }

@@ -8,11 +8,12 @@ if (!url) {
 }
 
 function isSupabaseUrl(connectionUrl: string): boolean {
+  /** 풀러(*.pooler.supabase.com)와 직결(db.*.supabase.co) 둘 다 인식해 SSL을 적용 */
   try {
     const u = new URL(connectionUrl.replace(/^postgres:/, "postgresql:"))
-    return u.hostname.includes("supabase.com")
+    return u.hostname.includes("supabase.com") || u.hostname.includes("supabase.co")
   } catch {
-    return connectionUrl.includes("supabase.com")
+    return connectionUrl.includes("supabase.com") || connectionUrl.includes("supabase.co")
   }
 }
 

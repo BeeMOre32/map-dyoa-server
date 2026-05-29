@@ -1,11 +1,11 @@
 import { and, count, desc, eq, inArray } from "drizzle-orm"
-import { db } from "../db"
+import { db, withDbRetry } from "../db"
 import { clips, feedbacks, games, scheduleParticipants, schedules, streamers } from "../db/schema"
 import { logApi, logTrace } from "../lib/server-log"
 
 export async function getAdminStats() {
   logTrace("admin.stats")
-  const [scheduleRows, clipRows, streamerRows, pendingRows] = await Promise.all([
+  const [scheduleRows, clipRows, streamerRows, pendingRows] = await withDbRetry(() => Promise.all([
     db.select({ c: count() }).from(schedules),
     db.select({ c: count() }).from(clips),
     db
@@ -16,7 +16,7 @@ export async function getAdminStats() {
       .select({ c: count() })
       .from(feedbacks)
       .where(eq(feedbacks.status, "PENDING")),
-  ])
+  ]))
 
   const stats = {
     scheduleCount: Number(scheduleRows[0]?.c ?? 0),
@@ -30,7 +30,7 @@ export async function getAdminStats() {
 
 export async function getAdminClips() {
   logTrace("admin.clips")
-  const rows = await db.query.clips.findMany({
+  const rows = await withDbRetry(() => db.query.clips.findMany({
     orderBy: (c, { desc }) => [desc(c.createdAt)],
     with: {
       participants: {
@@ -41,7 +41,7 @@ export async function getAdminClips() {
         },
       },
     },
-  })
+  }))
   logApi("admin", { clips: rows.length })
   return rows
 }
@@ -53,36 +53,38 @@ export async function getAdminSchedules(args?: { from?: string; to?: string }) {
   const fromDate = from ? new Date(from) : null
   const toDate = to ? new Date(`${to}T23:59:59`) : null
 
-  const rows = fromDate || toDate
-    ? await db.query.schedules.findMany({
-        where: (s, { and, gte, lte }) =>
-          and(
-            ...(fromDate ? [gte(s.startTime, fromDate)] : []),
-            ...(toDate ? [lte(s.startTime, toDate)] : []),
-          ),
-        orderBy: (s, { desc }) => [desc(s.startTime)],
-        with: {
-          game: { columns: { id: true, title: true } },
-          participants: {
-            with: {
-              streamer: { columns: { id: true, name: true, colorCode: true } },
+  const rows = await withDbRetry(() =>
+    fromDate || toDate
+      ? db.query.schedules.findMany({
+          where: (s, { and, gte, lte }) =>
+            and(
+              ...(fromDate ? [gte(s.startTime, fromDate)] : []),
+              ...(toDate ? [lte(s.startTime, toDate)] : []),
+            ),
+          orderBy: (s, { desc }) => [desc(s.startTime)],
+          with: {
+            game: { columns: { id: true, title: true } },
+            participants: {
+              with: {
+                streamer: { columns: { id: true, name: true, colorCode: true } },
+              },
             },
           },
-        },
-        limit: 200,
-      })
-    : await db.query.schedules.findMany({
-        orderBy: (s, { desc }) => [desc(s.startTime)],
-        with: {
-          game: { columns: { id: true, title: true } },
-          participants: {
-            with: {
-              streamer: { columns: { id: true, name: true, colorCode: true } },
+          limit: 200,
+        })
+      : db.query.schedules.findMany({
+          orderBy: (s, { desc }) => [desc(s.startTime)],
+          with: {
+            game: { columns: { id: true, title: true } },
+            participants: {
+              with: {
+                streamer: { columns: { id: true, name: true, colorCode: true } },
+              },
             },
           },
-        },
-        limit: 200,
-      })
+          limit: 200,
+        }),
+  )
 
   logApi("admin", { schedules: rows.length, ...(from ? { from } : {}), ...(to ? { to } : {}) })
   return rows
@@ -90,7 +92,7 @@ export async function getAdminSchedules(args?: { from?: string; to?: string }) {
 
 export async function getRecentActivity() {
   logTrace("admin.recentActivity")
-  const [scheduleRows, clipRows] = await Promise.all([
+  const [scheduleRows, clipRows] = await withDbRetry(() => Promise.all([
     db.query.schedules.findMany({
       orderBy: (s, { desc }) => [desc(s.createdAt)],
       limit: 5,
@@ -107,18 +109,20 @@ export async function getRecentActivity() {
         },
       },
     }),
-  ])
+  ]))
   logApi("admin", { recentSchedules: scheduleRows.length, recentClips: clipRows.length })
   return { schedules: scheduleRows, clips: clipRows }
 }
 
 export async function getHoi4Leaderboard() {
   logTrace("admin.hoi4Leaderboard")
-  const hoi4NaeJeonSchedules = await db
-    .select({ id: schedules.id })
-    .from(schedules)
-    .innerJoin(games, eq(schedules.gameId, games.id))
-    .where(and(eq(schedules.isNaeJeon, true), eq(games.isHoi4, true)))
+  const hoi4NaeJeonSchedules = await withDbRetry(() =>
+    db
+      .select({ id: schedules.id })
+      .from(schedules)
+      .innerJoin(games, eq(schedules.gameId, games.id))
+      .where(and(eq(schedules.isNaeJeon, true), eq(games.isHoi4, true))),
+  )
 
   const scheduleIds = hoi4NaeJeonSchedules.map((r) => r.id)
   if (scheduleIds.length === 0) {
@@ -126,7 +130,7 @@ export async function getHoi4Leaderboard() {
     return { leaderboard: [], sessions: [], totalSessions: 0 }
   }
 
-  const rows = await db.query.scheduleParticipants.findMany({
+  const rows = await withDbRetry(() => db.query.scheduleParticipants.findMany({
     where: (sp, { inArray }) => inArray(sp.scheduleId, scheduleIds),
     with: {
       streamer: { columns: { id: true, name: true, colorCode: true } },
@@ -135,7 +139,7 @@ export async function getHoi4Leaderboard() {
         with: { game: { columns: { title: true } } },
       },
     },
-  })
+  }))
 
   rows.sort(
     (a, b) =>

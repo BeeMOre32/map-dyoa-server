@@ -11,7 +11,7 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm"
-import { db } from "../db"
+import { db, withDbRetry } from "../db"
 import { clips } from "../db/schema"
 import { logApi, logTrace } from "../lib/server-log"
 
@@ -130,46 +130,50 @@ export async function listClipsPaginated(args: {
   const clipWhere =
     wfSql != null ? (c: ClipFilterColumns) => clipFilterSQLForTable(filterOpts, c)! : undefined
 
-  const rows = clipsOnly
-    ? await db.query.clips.findMany({
-        ...(clipWhere ? { where: clipWhere } : {}),
-        orderBy: (c, { asc: a, desc: d }) =>
-          sort === "title"
-            ? [a(c.title)]
-            : sort === "oldest"
-              ? [a(c.createdAt)]
-              : sort === "date_desc"
-                ? [d(c.clipDate), d(c.createdAt)]
-                : sort === "date_asc"
-                  ? [a(c.clipDate), a(c.createdAt)]
-                  : [d(c.createdAt)],
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-        with: { participants: { with: { streamer: true } } },
-      })
-    : await db.query.clips.findMany({
-        ...(clipWhere ? { where: clipWhere } : {}),
-        orderBy: (c, { asc: a, desc: d }) =>
-          sort === "title"
-            ? [a(c.title)]
-            : sort === "oldest"
-              ? [a(c.createdAt)]
-              : sort === "date_desc"
-                ? [d(c.clipDate), d(c.createdAt)]
-                : sort === "date_asc"
-                  ? [a(c.clipDate), a(c.createdAt)]
-                  : [d(c.createdAt)],
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-        with: {
-          participants: { with: { streamer: true } },
-          schedule: { with: { game: true } },
-        },
-      })
+  const rows = await withDbRetry(() =>
+    clipsOnly
+      ? db.query.clips.findMany({
+          ...(clipWhere ? { where: clipWhere } : {}),
+          orderBy: (c, { asc: a, desc: d }) =>
+            sort === "title"
+              ? [a(c.title)]
+              : sort === "oldest"
+                ? [a(c.createdAt)]
+                : sort === "date_desc"
+                  ? [d(c.clipDate), d(c.createdAt)]
+                  : sort === "date_asc"
+                    ? [a(c.clipDate), a(c.createdAt)]
+                    : [d(c.createdAt)],
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+          with: { participants: { with: { streamer: true } } },
+        })
+      : db.query.clips.findMany({
+          ...(clipWhere ? { where: clipWhere } : {}),
+          orderBy: (c, { asc: a, desc: d }) =>
+            sort === "title"
+              ? [a(c.title)]
+              : sort === "oldest"
+                ? [a(c.createdAt)]
+                : sort === "date_desc"
+                  ? [d(c.clipDate), d(c.createdAt)]
+                  : sort === "date_asc"
+                    ? [a(c.clipDate), a(c.createdAt)]
+                    : [d(c.createdAt)],
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+          with: {
+            participants: { with: { streamer: true } },
+            schedule: { with: { game: true } },
+          },
+        }),
+  )
 
-  const totalRow = wfSql
-    ? await db.select({ c: count() }).from(clips).where(wfSql)
-    : await db.select({ c: count() }).from(clips)
+  const totalRow = await withDbRetry(() =>
+    wfSql
+      ? db.select({ c: count() }).from(clips).where(wfSql)
+      : db.select({ c: count() }).from(clips),
+  )
 
   const total = Number(totalRow[0]?.c ?? 0)
   logApi("clips", {
@@ -205,7 +209,7 @@ export async function listClipsByScheduleIdPaginated(args: {
   const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 20))
   const wf = eq(clips.scheduleId, sid)
 
-  const rows = await db.query.clips.findMany({
+  const rows = await withDbRetry(() => db.query.clips.findMany({
     where: (c, { eq: eqFn }) => eqFn(c.scheduleId, sid),
     orderBy: (c, { asc: a }) => [a(c.createdAt)],
     limit: pageSize,
@@ -213,9 +217,9 @@ export async function listClipsByScheduleIdPaginated(args: {
     with: {
       participants: { with: { streamer: true } },
     },
-  })
+  }))
 
-  const totalRow = await db.select({ c: count() }).from(clips).where(wf)
+  const totalRow = await withDbRetry(() => db.select({ c: count() }).from(clips).where(wf))
   const total = Number(totalRow[0]?.c ?? 0)
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize)
 
@@ -232,26 +236,28 @@ export async function listClipsByScheduleIdPaginated(args: {
 
 export async function getClipById(id: string) {
   logTrace("clips.byId", { id })
-  const row = await db.query.clips.findFirst({
+  const row = await withDbRetry(() => db.query.clips.findFirst({
     where: (c, { eq: eqFn }) => eqFn(c.id, id),
     with: {
       participants: { with: { streamer: true } },
       schedule: { with: { game: true } },
     },
-  })
+  }))
   logApi("clips", { byId: id, found: Boolean(row) })
   return row ?? null
 }
 
 export async function getClipMonths(): Promise<string[]> {
   logTrace("clips.months")
-  const rows = await db
-    .select({
-      clipDate: clips.clipDate,
-      createdAt: clips.createdAt,
-    })
-    .from(clips)
-    .orderBy(desc(clips.createdAt))
+  const rows = await withDbRetry(() =>
+    db
+      .select({
+        clipDate: clips.clipDate,
+        createdAt: clips.createdAt,
+      })
+      .from(clips)
+      .orderBy(desc(clips.createdAt)),
+  )
 
   const months = new Set<string>()
   for (const c of rows) {

@@ -1,4 +1,4 @@
-import { db } from "../db"
+import { db, withDbRetry } from "../db"
 import { logSchedules, logTrace } from "../lib/server-log"
 import {
   flattenScheduleParticipants,
@@ -176,16 +176,18 @@ export async function listSchedules(
     }
   }
 
-  const rows = await db.query.schedules.findMany({
-    where: (s, { and: a, gte: ge, lte: le }) =>
-      a(ge(s.startTime, fromDate), le(s.startTime, toDate)),
-    orderBy: (s, { asc: ascFn }) => [ascFn(s.startTime)],
-    with: {
-      game: true,
-      /** ScheduleParticipant + Streamer */
-      participants: { with: { streamer: true } },
-    },
-  })
+  const rows = await withDbRetry(() =>
+    db.query.schedules.findMany({
+      where: (s, { and: a, gte: ge, lte: le }) =>
+        a(ge(s.startTime, fromDate), le(s.startTime, toDate)),
+      orderBy: (s, { asc: ascFn }) => [ascFn(s.startTime)],
+      with: {
+        game: true,
+        /** ScheduleParticipant + Streamer */
+        participants: { with: { streamer: true } },
+      },
+    }),
+  )
 
   const scheduleParticipantCount = rows.reduce(
     (n, r) => n + (r.participants?.length ?? 0),
@@ -214,13 +216,15 @@ export async function getScheduleById(
   id: string,
 ): Promise<FlattenedSchedule | null> {
   logTrace("schedules.byId", { id })
-  const row = await db.query.schedules.findFirst({
-    where: (s, { eq: eqFn }) => eqFn(s.id, id),
-    with: {
-      game: true,
-      participants: { with: { streamer: true } },
-    },
-  })
+  const row = await withDbRetry(() =>
+    db.query.schedules.findFirst({
+      where: (s, { eq: eqFn }) => eqFn(s.id, id),
+      with: {
+        game: true,
+        participants: { with: { streamer: true } },
+      },
+    }),
+  )
   if (!row) {
     logSchedules("byId", { id, found: false, scheduleParticipants: 0 })
     return null

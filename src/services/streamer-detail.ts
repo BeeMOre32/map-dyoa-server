@@ -1,5 +1,5 @@
 import { and, count, eq, sql, type SQL } from "drizzle-orm"
-import { db } from "../db"
+import { db, withDbRetry } from "../db"
 import { clipParticipants, clips, scheduleParticipants, schedules } from "../db/schema"
 import { logApi, logTrace } from "../lib/server-log"
 
@@ -31,7 +31,7 @@ export async function getStreamerDetailBundle(streamerId: string) {
   const clipWhere = clipsForStreamerWhere(sid)
 
   const [scheduleList, linkedClipsRows, scheduleCountRow, clipCountRow] =
-    await Promise.all([
+    await withDbRetry(() => Promise.all([
       db.query.schedules.findMany({
         where: schWhere,
         orderBy: (s, { desc: d }) => [d(s.startTime)],
@@ -63,7 +63,7 @@ export async function getStreamerDetailBundle(streamerId: string) {
         .select({ c: count() })
         .from(clipParticipants)
         .where(eq(clipParticipants.streamerId, sid)),
-    ])
+    ]))
 
   const scheduleCount = Number(scheduleCountRow[0]?.c ?? 0)
   const clipCount = Number(clipCountRow[0]?.c ?? 0)

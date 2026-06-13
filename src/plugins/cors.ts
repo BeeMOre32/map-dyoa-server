@@ -16,11 +16,21 @@ function allowedOriginList(): string[] {
   ]
 }
 
+function isAllowedOrigin(origin: string): boolean {
+  if (allowedOriginList().includes(origin)) return true
+  try {
+    const host = new URL(origin).hostname
+    return host === "vercel.app" || host.endsWith(".vercel.app")
+  } catch {
+    return false
+  }
+}
+
 export const corsPlugin = cors({
   origin: (request: Request) => {
     const origin = request.headers.get("origin")
     if (!origin) return true
-    return allowedOriginList().includes(origin)
+    return isAllowedOrigin(origin)
   },
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS", "HEAD"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],

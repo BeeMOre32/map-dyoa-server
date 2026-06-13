@@ -1,0 +1,2 @@
+ALTER TABLE "AuctionRoom" ADD COLUMN IF NOT EXISTS "timerSeconds" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "AuctionRoom" ADD COLUMN IF NOT EXISTS "currentEndsAt" timestamp (3) with time zone;

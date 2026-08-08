@@ -1,7 +1,5 @@
 import * as Sentry from "@sentry/elysia"
 import { Elysia } from "elysia"
-import { sql } from "drizzle-orm"
-import { db } from "./db"
 import { adminRoutes } from "./routes/admin"
 import { auctionsRoutes } from "./routes/auctions"
 import { auctionWsRoutes } from "./routes/auction-ws"
@@ -12,6 +10,7 @@ import { httpLogPlugin } from "./plugins/http-log"
 import { requestTracePlugin } from "./plugins/request-trace"
 import { clipsRoutes } from "./routes/clips"
 import { gamesRoutes } from "./routes/games"
+import { healthRoutes } from "./routes/health"
 import { schedulesRoutes } from "./routes/schedules"
 import { streamersRoutes } from "./routes/streamers"
 import { logApi } from "./lib/server-log"
@@ -39,6 +38,7 @@ const app = Sentry.withElysia(new Elysia(), {
   .use(corsPlugin)
   .use(requestTracePlugin)
   .use(httpLogPlugin)
+  .use(healthRoutes)
   .use(schedulesRoutes)
   .use(streamersRoutes)
   .use(clipsRoutes)
@@ -52,10 +52,6 @@ const app = Sentry.withElysia(new Elysia(), {
     service: "map-dyoa-server",
     status: "ok",
   }))
-  .get("/health", async () => {
-    await db.execute(sql`select 1`)
-    return { ok: true as const, db: "up" as const }
-  })
   .listen({ port, hostname: "0.0.0.0" })
 
 if (process.env.SENTRY_DSN?.trim()) {

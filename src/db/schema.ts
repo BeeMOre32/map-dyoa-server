@@ -8,6 +8,7 @@ import {
   boolean,
   index,
   integer,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -408,9 +409,50 @@ export const auctionBids = pgTable(
 
 // --- Relations (선택: relational query API용) ---
 
+// --- Bongnudo RP ---
+
+export const bongnudoProfiles = pgTable(
+  "BongnudoProfile",
+  {
+    id: text("id").primaryKey(),
+    seasonKey: text("seasonKey").notNull().default("bongnudo2"),
+    streamerId: text("streamerId")
+      .notNull()
+      .references(() => streamers.id, { onDelete: "cascade" }),
+    rpName: text("rpName"),
+    occupation: text("occupation"),
+    factionId: text("factionId"),
+    concept: text("concept"),
+    notes: text("notes"),
+    updatedByUserId: text("updatedByUserId"),
+    createdAt: timestamp("createdAt", { precision: 3, withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updatedAt", { precision: 3, withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    seasonStreamerUnique: uniqueIndex(
+      "BongnudoProfile_seasonKey_streamerId_key",
+    ).on(t.seasonKey, t.streamerId),
+    streamerIdIdx: index("BongnudoProfile_streamerId_idx").on(t.streamerId),
+    seasonKeyIdx: index("BongnudoProfile_seasonKey_idx").on(t.seasonKey),
+    factionIdIdx: index("BongnudoProfile_factionId_idx").on(t.factionId),
+  }),
+);
+
 export const streamersRelations = relations(streamers, ({ many }) => ({
   scheduleParticipants: many(scheduleParticipants),
   clipParticipants: many(clipParticipants),
+  bongnudoProfiles: many(bongnudoProfiles),
+}));
+
+export const bongnudoProfilesRelations = relations(bongnudoProfiles, ({ one }) => ({
+  streamer: one(streamers, {
+    fields: [bongnudoProfiles.streamerId],
+    references: [streamers.id],
+  }),
 }));
 
 export const gamesRelations = relations(games, ({ many }) => ({
@@ -522,6 +564,43 @@ export const auctionNomineesRelations = relations(
       references: [streamers.id],
     }),
     bids: many(auctionBids),
+  }),
+);
+
+export const clipCandidateStatus = pgEnum("ClipCandidateStatus", [
+  "PENDING",
+  "APPROVED",
+  "DISMISSED",
+]);
+
+export const clipCandidates = pgTable(
+  "ClipCandidate",
+  {
+    id: text("id").primaryKey(),
+    clipUid: text("clipUid").notNull().unique(),
+    url: text("url").notNull(),
+    title: text("title").notNull(),
+    thumbnailUrl: text("thumbnailUrl"),
+    readCount: integer("readCount").notNull().default(0),
+    streamerId: text("streamerId").notNull(),
+    streamerName: text("streamerName").notNull(),
+    clipDate: timestamp("clipDate", { precision: 3, withTimezone: true }),
+    status: clipCandidateStatus("status").notNull().default("PENDING"),
+    detectedAt: timestamp("detectedAt", { precision: 3, withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastSeenAt: timestamp("lastSeenAt", { precision: 3, withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp("resolvedAt", { precision: 3, withTimezone: true }),
+    clipId: text("clipId"),
+  },
+  (t) => ({
+    statusReadIdx: index("ClipCandidate_status_readCount_idx").on(
+      t.status,
+      t.readCount,
+    ),
+    streamerIdIdx: index("ClipCandidate_streamerId_idx").on(t.streamerId),
   }),
 );
 

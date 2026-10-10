@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/elysia"
 import { Elysia } from "elysia"
 import { adminRoutes } from "./routes/admin"
+import { bongnudoRoutes } from "./routes/bongnudo"
 import { auctionsRoutes } from "./routes/auctions"
 import { auctionWsRoutes } from "./routes/auction-ws"
 import { chzzkRoutes } from "./routes/chzzk"
@@ -8,6 +9,7 @@ import { corsPlugin } from "./plugins/cors"
 import { feedbacksRoutes } from "./routes/feedbacks"
 import { httpLogPlugin } from "./plugins/http-log"
 import { requestTracePlugin } from "./plugins/request-trace"
+import { clipCandidateRoutes } from "./routes/clip-candidates"
 import { clipsRoutes } from "./routes/clips"
 import { gamesRoutes } from "./routes/games"
 import { healthRoutes } from "./routes/health"
@@ -42,8 +44,10 @@ const app = Sentry.withElysia(new Elysia(), {
   .use(schedulesRoutes)
   .use(streamersRoutes)
   .use(clipsRoutes)
+  .use(clipCandidateRoutes)
   .use(gamesRoutes)
   .use(feedbacksRoutes)
+  .use(bongnudoRoutes)
   .use(chzzkRoutes)
   .use(adminRoutes)
   .use(auctionsRoutes)

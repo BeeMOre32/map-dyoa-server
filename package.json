@@ -11,6 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:ensure-schedule-updated-at": "bun run scripts/run-sql.ts scripts/add-schedule-updated-at.sql",
+    "db:ensure-bongnudo-profile": "bun run scripts/run-sql.ts scripts/add-bongnudo-profile.sql",
+    "db:ensure-clip-candidate": "bun run scripts/run-sql.ts scripts/add-clip-candidate.sql",
     "db:studio": "drizzle-kit studio",
     "sentry:verify": "bun run scripts/sentry-verify.ts"
   },

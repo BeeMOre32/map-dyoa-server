@@ -74,11 +74,29 @@ function findCoverUrl(obj: unknown): string | null {
   return null
 }
 
+const LIVE_META_CACHE_MS = 30_000
+const CLIP_META_CACHE_MS = 60 * 60 * 1000
+const CLIP_FETCH_TIMEOUT_MS = 8_000
+
 type LiveMetaContent = {
+  status?: string
   liveTitle?: string
   liveCategory?: string
+  liveCategoryValue?: string
+  concurrentUserCount?: number
+  liveImageUrl?: string | null
+  defaultThumbnailImageUrl?: string | null
   channel?: { channelName?: string }
 }
+
+type LiveDetailResult = { content: LiveMetaContent | null; upstreamStatus: number | null }
+
+const liveDetailCache = new Map<string, { at: number; value: LiveDetailResult }>()
+const liveDetailInflight = new Map<string, Promise<LiveDetailResult>>()
+
+type ClipMetaData = { thumbnailUrl: string | null; title: string }
+const clipMetaCache = new Map<string, { at: number; data: ClipMetaData }>()
+const clipMetaInflight = new Map<string, Promise<ClipMetaData | null>>()
 
 async function fetchLiveDetailContent(
   channelId: string,
@@ -121,6 +139,33 @@ async function fetchLiveDetailContent(
   return { content: null, upstreamStatus: lastStatus }
 }
 
+function liveThumbnailUrl(content: LiveMetaContent): string | null {
+  const template = content.liveImageUrl?.trim()
+  if (template) return template.replace("{type}", "720")
+  return content.defaultThumbnailImageUrl?.trim() || null
+}
+
+/** 성공한 live-detail만 30초 보관. 실패는 바로 다시 친다. */
+function getLiveDetailCached(channelId: string): Promise<LiveDetailResult> {
+  const now = Date.now()
+  const hit = liveDetailCache.get(channelId)
+  if (hit && now - hit.at < LIVE_META_CACHE_MS) return Promise.resolve(hit.value)
+
+  const pending = liveDetailInflight.get(channelId)
+  if (pending) return pending
+
+  const task = fetchLiveDetailContent(channelId)
+    .then((value) => {
+      if (value.content) liveDetailCache.set(channelId, { at: Date.now(), value })
+      return value
+    })
+    .finally(() => {
+      liveDetailInflight.delete(channelId)
+    })
+  liveDetailInflight.set(channelId, task)
+  return task
+}
+
 export async function getChzzkLiveMetaFromUrl(url: string) {
   logTrace("chzzk.liveMeta", { hasUrl: Boolean(url?.trim()) })
   const channelId = extractChannelId(url)
@@ -128,15 +173,13 @@ export async function getChzzkLiveMetaFromUrl(url: string) {
     return { ok: false as const, code: "INVALID_URL", message: "유효한 치지직 URL이 아닙니다." }
   }
 
-  const [{ content, upstreamStatus }, streamers] = await Promise.all([
-    fetchLiveDetailContent(channelId),
-    db.query.streamers.findMany({
-      columns: { id: true, name: true, chzzkUrl: true },
-      where: (s, { isNotNull }) => isNotNull(s.chzzkUrl),
+  const [{ content, upstreamStatus }, matched] = await Promise.all([
+    getLiveDetailCached(channelId),
+    db.query.streamers.findFirst({
+      columns: { id: true, name: true },
+      where: (s, { like }) => like(s.chzzkUrl, `%${channelId}%`),
     }),
   ])
-
-  const matched = streamers.find((s) => s.chzzkUrl?.includes(channelId))
 
   // Fly→치지직 일시 500/타임아웃 등이어도 502를 올리지 않음 (프론트·Vercel 노이즈 방지)
   if (!content) {
@@ -150,7 +193,11 @@ export async function getChzzkLiveMetaFromUrl(url: string) {
       data: {
         title: "",
         category: "",
+        categoryValue: "",
         channelName: "",
+        isLive: false,
+        viewerCount: null,
+        thumbnailUrl: null,
         matchedStreamerId: matched?.id ?? null,
         matchedStreamerName: matched?.name ?? null,
       },
@@ -160,17 +207,80 @@ export async function getChzzkLiveMetaFromUrl(url: string) {
   logApi("chzzk-meta", { liveMeta: true, channelId, matched: Boolean(matched) })
 
   const liveTitle = content.liveTitle?.trim()
+  const isLive = content.status === "OPEN"
   return {
     ok: true as const,
     data: {
       /** React controlled input 호환: null 대신 빈 문자열 */
       title: liveTitle || "",
       category: content.liveCategory?.trim() || "",
+      categoryValue: content.liveCategoryValue?.trim() || "",
       channelName: content.channel?.channelName?.trim() || "",
+      isLive,
+      viewerCount: isLive ? (content.concurrentUserCount ?? null) : null,
+      thumbnailUrl: isLive ? liveThumbnailUrl(content) : null,
       matchedStreamerId: matched?.id ?? null,
       matchedStreamerName: matched?.name ?? null,
     },
   }
+}
+
+async function fetchClipMeta(clipId: string): Promise<ClipMetaData | null> {
+  const playInfoRes = await fetch(
+    `https://api.chzzk.naver.com/service/v1/play-info/clip/${clipId}`,
+    {
+      headers: CHZZK_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(CLIP_FETCH_TIMEOUT_MS),
+    },
+  )
+  if (!playInfoRes.ok) {
+    logWarn("chzzk.clip_meta_upstream", { clipId, upstreamStatus: playInfoRes.status })
+    return null
+  }
+
+  const playInfo = (await playInfoRes.json()) as {
+    content?: { videoId?: string; inKey?: string; contentTitle?: string }
+  }
+  const videoId = playInfo?.content?.videoId ?? null
+  const inKey = playInfo?.content?.inKey ?? null
+  const title = playInfo?.content?.contentTitle?.trim() || ""
+  if (!videoId || !inKey) return null
+
+  const vodUrl =
+    `https://apis.naver.com/neonplayer/vodplay/v1/playback/${videoId}` +
+    `?key=${encodeURIComponent(inKey)}&sid=2208832&lang=ko_KR&connectType=PC` +
+    `&playerType=HTML5_FLASH&videoId=${videoId}&playType=CLIP`
+
+  const vodRes = await fetch(vodUrl, {
+    headers: CHZZK_HEADERS,
+    cache: "no-store",
+    signal: AbortSignal.timeout(CLIP_FETCH_TIMEOUT_MS),
+  })
+  if (!vodRes.ok) return { thumbnailUrl: null, title }
+
+  const thumbnailUrl = findCoverUrl(await vodRes.json())
+  return { thumbnailUrl, title }
+}
+
+/** 썸네일을 받은 클립만 1시간 보관. 실패·썸네일 없음은 다시 조회한다. */
+function getClipMetaCached(clipId: string): Promise<ClipMetaData | null> {
+  const hit = clipMetaCache.get(clipId)
+  if (hit && Date.now() - hit.at < CLIP_META_CACHE_MS) return Promise.resolve(hit.data)
+
+  const pending = clipMetaInflight.get(clipId)
+  if (pending) return pending
+
+  const task = fetchClipMeta(clipId)
+    .then((data) => {
+      if (data?.thumbnailUrl) clipMetaCache.set(clipId, { at: Date.now(), data })
+      return data
+    })
+    .finally(() => {
+      clipMetaInflight.delete(clipId)
+    })
+  clipMetaInflight.set(clipId, task)
+  return task
 }
 
 export async function getChzzkClipMetaFromUrl(url: string) {
@@ -185,26 +295,23 @@ export async function getChzzkClipMetaFromUrl(url: string) {
     }
   }
 
-  const playInfoRes = await fetch(
-    `https://api.chzzk.naver.com/service/v1/play-info/clip/${clipId}`,
-    { headers: CHZZK_HEADERS, cache: "no-store" },
-  )
-  if (!playInfoRes.ok) {
-    return {
-      ok: false as const,
-      code: "UPSTREAM_ERROR",
-      message: `play-info 오류: ${playInfoRes.status}`,
-      status: 502,
+  try {
+    const data = await getClipMetaCached(clipId)
+    if (!data) {
+      return {
+        ok: false as const,
+        code: "UPSTREAM_ERROR",
+        message: "클립 정보를 가져올 수 없습니다.",
+        status: 502,
+      }
     }
-  }
-
-  const playInfo = (await playInfoRes.json()) as {
-    content?: { videoId?: string; inKey?: string; contentTitle?: string }
-  }
-  const videoId = playInfo?.content?.videoId ?? null
-  const inKey = playInfo?.content?.inKey ?? null
-  const title = playInfo?.content?.contentTitle?.trim() || ""
-  if (!videoId || !inKey) {
+    logApi("chzzk-meta", { clipMeta: true, clipId, thumbnail: Boolean(data.thumbnailUrl) })
+    return { ok: true as const, data }
+  } catch (error) {
+    logWarn("chzzk.clip_meta_soft_fail", {
+      clipId,
+      message: error instanceof Error ? error.message : "timeout",
+    })
     return {
       ok: false as const,
       code: "UPSTREAM_ERROR",
@@ -212,23 +319,4 @@ export async function getChzzkClipMetaFromUrl(url: string) {
       status: 502,
     }
   }
-
-  const vodUrl =
-    `https://apis.naver.com/neonplayer/vodplay/v1/playback/${videoId}` +
-    `?key=${encodeURIComponent(inKey)}&sid=2208832&lang=ko_KR&connectType=PC` +
-    `&playerType=HTML5_FLASH&videoId=${videoId}&playType=CLIP`
-
-  const vodRes = await fetch(vodUrl, {
-    headers: CHZZK_HEADERS,
-    cache: "no-store",
-  })
-  if (!vodRes.ok) {
-    logApi("chzzk-meta", { clipMeta: true, clipId, vodStatus: vodRes.status })
-    return { ok: true as const, data: { thumbnailUrl: null, title } }
-  }
-
-  const vodData = await vodRes.json()
-  const thumbnailUrl = findCoverUrl(vodData)
-  logApi("chzzk-meta", { clipMeta: true, clipId, thumbnail: Boolean(thumbnailUrl) })
-  return { ok: true as const, data: { thumbnailUrl, title } }
 }

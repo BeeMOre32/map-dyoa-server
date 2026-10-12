@@ -40,6 +40,8 @@ if (port === 3100) {
 const app = Sentry.withElysia(new Elysia(), {
   shouldHandleError: sentryShouldCaptureElysiaError,
 })
+  .use(corsPlugin)
+  .use(writeGuard)
   .use(
     openapi({
       path: "/openapi",
@@ -55,8 +57,6 @@ const app = Sentry.withElysia(new Elysia(), {
       },
     }),
   )
-  .use(corsPlugin)
-  .use(writeGuard)
   .use(requestTracePlugin)
   .use(httpLogPlugin)
   .use(healthRoutes)

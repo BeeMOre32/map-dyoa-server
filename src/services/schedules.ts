@@ -183,8 +183,27 @@ export async function listSchedules(
       orderBy: (s, { asc: ascFn }) => [ascFn(s.startTime)],
       with: {
         game: true,
-        /** ScheduleParticipant + Streamer */
-        participants: { with: { streamer: true } },
+        /** 목록 응답에서는 소개 글을 빼 캘린더 JSON을 줄인다. */
+        participants: {
+          with: {
+            streamer: {
+              columns: {
+                id: true,
+                name: true,
+                handle: true,
+                generation: true,
+                role: true,
+                platform: true,
+                profileImg: true,
+                colorCode: true,
+                chzzkUrl: true,
+                youtubeUrl: true,
+                isGuest: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
       },
     }),
   )

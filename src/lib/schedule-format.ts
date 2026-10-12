@@ -135,7 +135,7 @@ export function flattenScheduleParticipants(
           colorCode: s.colorCode,
           chzzkUrl: s.chzzkUrl,
           youtubeUrl: s.youtubeUrl,
-          bio: s.bio,
+          bio: s.bio ?? null,
           isGuest: p.isGuest,
           createdAt: new Date(s.createdAt),
           nation: p.nation ?? null,

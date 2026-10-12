@@ -73,6 +73,9 @@ export const schedules = pgTable(
       .notNull()
       .defaultNow(),
   },
+  (t) => ({
+    startTimeIdx: index("Schedule_startTime_idx").on(t.startTime),
+  }),
 );
 
 // --- ScheduleParticipant ---

@@ -18,7 +18,7 @@ const LIVE_DETAIL_URL = (channelId: string) =>
 /** Next 서버 스냅샷과 같은 간격. 더 길면 끝난 방송이 LIVE로 남는다. */
 const CACHE_TTL_MS = 30_000
 const FETCH_TIMEOUT_MS = 4_000
-const POLL_CONCURRENCY = 6
+const POLL_CONCURRENCY = 12
 
 type LiveCache = {
   liveStreamerIds: string[]

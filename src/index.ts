@@ -14,6 +14,7 @@ import { clipsRoutes } from "./routes/clips"
 import { gamesRoutes } from "./routes/games"
 import { healthRoutes } from "./routes/health"
 import { schedulesRoutes } from "./routes/schedules"
+import { statsRoutes } from "./routes/stats"
 import { streamersRoutes } from "./routes/streamers"
 import { logApi } from "./lib/server-log"
 import { initSentryFromEnv, sentryShouldCaptureElysiaError } from "./lib/sentry-init"
@@ -42,6 +43,7 @@ const app = Sentry.withElysia(new Elysia(), {
   .use(httpLogPlugin)
   .use(healthRoutes)
   .use(schedulesRoutes)
+  .use(statsRoutes)
   .use(streamersRoutes)
   .use(clipsRoutes)
   .use(clipCandidateRoutes)

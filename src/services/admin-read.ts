@@ -28,6 +28,26 @@ export async function getAdminStats() {
   return stats
 }
 
+/** 공개 페이지 숫자. 일정 본문을 읽지 않는다. */
+export async function getPublicOverviewCounts() {
+  logTrace("stats.overview")
+  const [scheduleRows, clipRows, streamerRows, gameRows] = await withDbRetry(() =>
+    Promise.all([
+      db.select({ c: count() }).from(schedules),
+      db.select({ c: count() }).from(clips),
+      db.select({ c: count() }).from(streamers).where(eq(streamers.isGuest, false)),
+      db.select({ c: count() }).from(games),
+    ]),
+  )
+
+  return {
+    scheduleCount: Number(scheduleRows[0]?.c ?? 0),
+    clipCount: Number(clipRows[0]?.c ?? 0),
+    memberCount: Number(streamerRows[0]?.c ?? 0),
+    gameCount: Number(gameRows[0]?.c ?? 0),
+  }
+}
+
 export async function getAdminClips() {
   logTrace("admin.clips")
   const rows = await withDbRetry(() => db.query.clips.findMany({

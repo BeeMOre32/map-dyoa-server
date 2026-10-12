@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/elysia"
+import { openapi } from "@elysiajs/openapi"
 import { Elysia } from "elysia"
 import { adminRoutes } from "./routes/admin"
 import { bongnudoRoutes } from "./routes/bongnudo"
@@ -8,6 +9,7 @@ import { chzzkRoutes } from "./routes/chzzk"
 import { corsPlugin } from "./plugins/cors"
 import { feedbacksRoutes } from "./routes/feedbacks"
 import { httpLogPlugin } from "./plugins/http-log"
+import { writeGuard } from "./plugins/write-guard"
 import { requestTracePlugin } from "./plugins/request-trace"
 import { clipCandidateRoutes } from "./routes/clip-candidates"
 import { clipsRoutes } from "./routes/clips"
@@ -38,7 +40,23 @@ if (port === 3100) {
 const app = Sentry.withElysia(new Elysia(), {
   shouldHandleError: sentryShouldCaptureElysiaError,
 })
+  .use(
+    openapi({
+      path: "/openapi",
+      documentation: {
+        info: {
+          title: "map-dyoa-server",
+          version: "0.1.0",
+          description: "지도동 일정·멤버·클립 API",
+        },
+      },
+      exclude: {
+        paths: [/^\/auctions\/.*\/ws$/],
+      },
+    }),
+  )
   .use(corsPlugin)
+  .use(writeGuard)
   .use(requestTracePlugin)
   .use(httpLogPlugin)
   .use(healthRoutes)

@@ -43,6 +43,7 @@ bun install
   - 미설정 시 production/Fly에서는 JSON 로그
 - `SENTRY_DSN`: Sentry 사용 시 설정
 - `SENTRY_TRACES_SAMPLE_RATE`: 성능 트레이스 샘플링(기본 `0`)
+- `API_WRITE_TOKEN`: 있으면 일정·멤버 등 수정 요청에 `x-write-token` 필요. 비우면 기존처럼 허용
 
 ### 3) 개발 서버 실행
 

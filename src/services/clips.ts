@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm"
 import { db, withDbRetry } from "../db"
 import { clips } from "../db/schema"
+import { recommendCountsByClipId } from "./clip-recommends"
 import { logApi, logTrace } from "../lib/server-log"
 
 export type ClipSortOption =
@@ -185,8 +186,12 @@ export async function listClipsPaginated(args: {
     total,
   })
 
+  const counts = await recommendCountsByClipId(rows.map((row) => row.id))
   return {
-    clips: rows,
+    clips: rows.map((row) => ({
+      ...row,
+      recommends: counts.get(row.id) ?? 0,
+    })),
     total,
     totalPages: Math.ceil(total / pageSize),
   }
@@ -231,7 +236,15 @@ export async function listClipsByScheduleIdPaginated(args: {
     total,
   })
 
-  return { clips: rows, total, totalPages }
+  const counts = await recommendCountsByClipId(rows.map((row) => row.id))
+  return {
+    clips: rows.map((row) => ({
+      ...row,
+      recommends: counts.get(row.id) ?? 0,
+    })),
+    total,
+    totalPages,
+  }
 }
 
 export async function getClipById(id: string) {
@@ -244,7 +257,9 @@ export async function getClipById(id: string) {
     },
   }))
   logApi("clips", { byId: id, found: Boolean(row) })
-  return row ?? null
+  if (!row) return null
+  const counts = await recommendCountsByClipId([row.id])
+  return { ...row, recommends: counts.get(row.id) ?? 0 }
 }
 
 export async function getClipMonths(): Promise<string[]> {

@@ -126,6 +126,29 @@ export const clips = pgTable(
   }),
 );
 
+/** 클립 추천. 한 브라우저당 한 표이고, 수는 주가 바뀌어도 지워지지 않는다. */
+export const clipRecommends = pgTable(
+  "ClipRecommend",
+  {
+    id: text("id").primaryKey(),
+    clipId: text("clipId")
+      .notNull()
+      .references(() => clips.id, { onDelete: "cascade" }),
+    voterKey: text("voterKey").notNull(),
+    createdAt: timestamp("createdAt", { precision: 3, withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    clipVoterUnique: uniqueIndex("ClipRecommend_clipId_voterKey_key").on(
+      t.clipId,
+      t.voterKey,
+    ),
+    clipIdIdx: index("ClipRecommend_clipId_idx").on(t.clipId),
+    createdAtIdx: index("ClipRecommend_createdAt_idx").on(t.createdAt),
+  }),
+);
+
 // --- ClipParticipant ---
 
 export const clipParticipants = pgTable(

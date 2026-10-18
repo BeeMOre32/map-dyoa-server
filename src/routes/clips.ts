@@ -7,6 +7,10 @@ import {
   listClipsPaginated,
   type ClipSortOption,
 } from "../services/clips"
+import {
+  listClipWeekRecommends,
+  toggleClipRecommend,
+} from "../services/clip-recommends"
 
 const SORTS: ClipSortOption[] = [
   "newest",
@@ -21,6 +25,39 @@ export const clipsRoutes = new Elysia({ prefix: "/clips" })
     const months = await getClipMonths()
     return { months }
   })
+  .get(
+    "/week-recommends",
+    async ({ query }) => {
+      const limit = query.limit ? Number(query.limit) : 20
+      const rows = await listClipWeekRecommends(Number.isFinite(limit) ? limit : 20)
+      return { clips: rows }
+    },
+    {
+      query: t.Object({
+        limit: t.Optional(t.String()),
+      }),
+    },
+  )
+  .post(
+    "/:id/recommend",
+    async ({ params, body, set }) => {
+      const result = await toggleClipRecommend(params.id, body.voterId)
+      if (result === "BAD_VOTER") {
+        set.status = 400
+        return { error: "BAD_VOTER" as const }
+      }
+      if (result === "NOT_FOUND") {
+        set.status = 404
+        return { error: "NOT_FOUND" as const }
+      }
+      return result
+    },
+    {
+      body: t.Object({
+        voterId: t.String(),
+      }),
+    },
+  )
   .get(
     "/",
     async ({ query }) => {

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/bun"
 import { getRequestId } from "./request-context"
 
 export type LogFieldValue =
@@ -75,6 +76,41 @@ function writeLine(level: "info" | "warn" | "error", line: string): void {
   else console.log(line)
 }
 
+function sentryLogsEnabled(): boolean {
+  if (process.env.SENTRY_LOGS === "0") return false
+  return Boolean(process.env.SENTRY_DSN?.trim())
+}
+
+function toSentryAttributes(
+  fields: LogFields,
+): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {}
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) continue
+    if (typeof value === "string") {
+      out[key] = value.length > 2000 ? value.slice(0, 2000) : value
+      continue
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      out[key] = value
+      continue
+    }
+    out[key] = value.join(",")
+  }
+  return out
+}
+
+function sendSentryLog(
+  level: "warn" | "error",
+  message: string,
+  fields: LogFields,
+): void {
+  if (!sentryLogsEnabled()) return
+  const attributes = toSentryAttributes(fields)
+  if (level === "error") Sentry.logger.error(message, attributes)
+  else Sentry.logger.warn(message, attributes)
+}
+
 /** 일정·참가자(ScheduleParticipant) 조회 등 */
 export function logSchedules(scope: string, fields: LogFields): void {
   const merged = withRequestId(fields)
@@ -109,6 +145,7 @@ export function logWarn(msg: string, fields: LogFields = {}): void {
   } else {
     console.warn(`[warn] ${msg} ${formatFields(merged)}`)
   }
+  sendSentryLog("warn", msg, merged)
 }
 
 /**
@@ -130,6 +167,7 @@ export function logException(scope: string, err: unknown, fields: LogFields = {}
       `[error] ${scope} ${formatFields(withRequestId(fields))} errName=${e.name} errMessage=${e.message}\n${stack}`,
     )
   }
+  sendSentryLog("error", scope, merged)
 }
 
 function httpAccessLevel(status: number): "info" | "warn" | "error" {

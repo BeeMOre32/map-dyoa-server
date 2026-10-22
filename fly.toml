@@ -4,6 +4,7 @@
 #
 # Sentry: fly secrets set SENTRY_DSN="https://...@o....ingest.sentry.io/..."
 # 거절된 접근(토큰 없음·틀린 토큰·횟수 초과)은 Sentry 경고로 올라간다. 끄려면 SECURITY_ALERTS=0
+# 경고·오류 로그는 Sentry Logs로 보낸다. 끄려면 SENTRY_LOGS=0
 # 쓰기 보호: fly secrets set API_WRITE_TOKEN="..."  (Next 의 MAP_DYOA_SERVER_WRITE_TOKEN 과 같은 값)
 # 선택: SENTRY_ENVIRONMENT, SENTRY_RELEASE(git SHA), SENTRY_SEND_DEFAULT_PII=1
 # 트레이싱(Performance 쿼터): 기본 끔. 필요 시만 SENTRY_TRACES_SAMPLE_RATE=0.05 등

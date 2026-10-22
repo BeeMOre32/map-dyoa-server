@@ -15,8 +15,8 @@ export function initSentryFromEnv(): void {
   const dsn = process.env.SENTRY_DSN?.trim()
   if (!dsn) return
 
-  // 무료 티어: Issues(오류 이벤트)만 쓰고 Performance·Logs 쿼터는 기본으로 끔.
-  // 트레이싱이 필요하면 `SENTRY_TRACES_SAMPLE_RATE`만 0 초과로 설정 (과금·쿼터 확인).
+  // 트레이싱(Performance 쿼터)은 기본으로 끔. 필요하면 `SENTRY_TRACES_SAMPLE_RATE`만 켠다.
+  // Logs는 경고·오류만 보낸다. 끄려면 `SENTRY_LOGS=0`.
   const tracesSampleRate = parseSampleRate(
     process.env.SENTRY_TRACES_SAMPLE_RATE,
     0,
@@ -33,7 +33,7 @@ export function initSentryFromEnv(): void {
     release: process.env.SENTRY_RELEASE?.trim(),
     tracesSampleRate,
     sendDefaultPii,
-    enableLogs: false,
+    enableLogs: process.env.SENTRY_LOGS !== "0",
   })
 }
 

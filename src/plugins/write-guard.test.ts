@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { Elysia } from "elysia"
 import { writeGuard } from "./write-guard"
 
+process.env.SECURITY_ALERTS = "0"
+
 const TOKEN = "test-write-token"
 const savedToken = process.env.API_WRITE_TOKEN
 

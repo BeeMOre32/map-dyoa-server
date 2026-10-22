@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto"
 import { Elysia } from "elysia"
 import { clientIp } from "../lib/http-request-log"
+import { reportSecurityRejection } from "../lib/security-alert"
 import { logWarn } from "../lib/server-log"
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"])
@@ -44,12 +45,19 @@ function reject(
   reason: "missing_token" | "bad_token" | "rate_limited",
   status: 401 | 429,
 ) {
+  const ip = clientIp(request) ?? "unknown"
   logWarn("security_rejected", {
     type: "security",
     reason,
     method: request.method,
     path,
-    clientIp: clientIp(request) ?? "unknown",
+    clientIp: ip,
+  })
+  reportSecurityRejection({
+    reason,
+    method: request.method,
+    path,
+    clientIp: ip,
   })
   set.status = status
   return {

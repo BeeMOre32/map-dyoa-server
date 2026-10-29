@@ -16,6 +16,7 @@
     "db:ensure-clip-candidate": "bun run scripts/run-sql.ts scripts/add-clip-candidate.sql",
     "db:ensure-clip-week-play": "bun run scripts/run-sql.ts scripts/add-clip-week-play.sql",
     "db:ensure-clip-recommend": "bun run scripts/run-sql.ts scripts/add-clip-recommend.sql",
+    "db:ensure-feedback-reply": "bun run scripts/run-sql.ts scripts/add-feedback-reply.sql",
     "db:ensure-schedule-start-time-index": "bun run scripts/run-sql.ts scripts/add-schedule-start-time-index.sql",
     "db:studio": "drizzle-kit studio",
     "sentry:verify": "bun run scripts/sentry-verify.ts"

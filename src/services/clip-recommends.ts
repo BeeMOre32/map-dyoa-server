@@ -116,7 +116,7 @@ export async function listClipWeekRecommends(
       from "ClipRecommend"
       group by "clipId"
       having count(*) filter (where "createdAt" >= ${start}::timestamptz) > 0
-      order by "weekRecommends" desc, "recommends" desc
+      order by "recommends" desc, "weekRecommends" desc
       limit ${take}
     `),
   )

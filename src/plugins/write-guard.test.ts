@@ -16,7 +16,9 @@ const api = new Elysia()
   .post("/schedules", () => ({ created: true as const }))
   .put("/schedules/:id", () => ({ updated: true as const }))
   .delete("/schedules/:id", () => ({ deleted: true as const }))
+  .get("/feedbacks", () => ({ feedbacks: [] as const }))
   .post("/feedbacks", () => ({ id: "feedback" }))
+  .post("/feedbacks/receipts", () => ({ replies: [] as const }))
   .patch("/feedbacks/:id/reject", () => ({ ok: true as const }))
   .post("/auctions", () => ({ room: true as const }))
 
@@ -48,6 +50,13 @@ async function send(
 }
 
 describe("쓰기 보호", () => {
+  test("피드백 목록은 토큰이 없어도 막는다", async () => {
+    delete process.env.API_WRITE_TOKEN
+    const res = await send("GET", "/feedbacks")
+    expect(res.status).toBe(401)
+    expect(res.body).toEqual({ error: "UNAUTHORIZED" })
+  })
+
   test("토큰이 없으면 수정을 막지 않는다", async () => {
     delete process.env.API_WRITE_TOKEN
     const res = await send("POST", "/schedules")
@@ -63,8 +72,9 @@ describe("쓰기 보호", () => {
     const reject = await send("PATCH", "/feedbacks/1/reject")
     const docs = await send("GET", "/openapi")
     const spec = await send("GET", "/openapi/json")
+    const list = await send("GET", "/feedbacks")
 
-    for (const res of [schedules, updated, deleted, reject, docs, spec]) {
+    for (const res of [schedules, updated, deleted, reject, docs, spec, list]) {
       expect(res.status).toBe(401)
       expect(res.body).toEqual({ error: "UNAUTHORIZED" })
     }
@@ -75,7 +85,11 @@ describe("쓰기 보호", () => {
     const wrong = await send("POST", "/schedules", { "x-write-token": "nope" })
     const right = await send("POST", "/schedules", { "x-write-token": TOKEN })
     const docs = await send("GET", "/openapi", { "x-write-token": TOKEN })
+    const list = await send("GET", "/feedbacks", { "x-write-token": TOKEN })
+    const receipts = await send("POST", "/feedbacks/receipts")
 
+    expect(list.status).toBe(200)
+    expect(receipts.status).toBe(200)
     expect(wrong.status).toBe(401)
     expect(wrong.body).toEqual({ error: "UNAUTHORIZED" })
     expect(right.status).toBe(200)

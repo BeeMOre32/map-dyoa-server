@@ -184,6 +184,8 @@ export const feedbacks = pgTable(
     streamerId: text("streamerId"),
     streamerName: text("streamerName"),
     status: text("status").notNull().default("PENDING"),
+    reply: text("reply"),
+    receiptHash: text("receiptHash"),
     createdAt: timestamp("createdAt", { precision: 3, withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -69,6 +69,14 @@ function isFeedbackCreate(method: string, path: string): boolean {
   return method === "POST" && (path === "/feedbacks" || path === "/feedbacks/")
 }
 
+function isFeedbackList(method: string, path: string): boolean {
+  return method === "GET" && (path === "/feedbacks" || path === "/feedbacks/")
+}
+
+function isFeedbackReceipt(method: string, path: string): boolean {
+  return method === "POST" && (path === "/feedbacks/receipts" || path === "/feedbacks/receipts/")
+}
+
 function isAuctionWrite(method: string, path: string): boolean {
   return WRITE_METHODS.has(method) && (path === "/auctions" || path.startsWith("/auctions/"))
 }
@@ -89,6 +97,14 @@ export const writeGuard = new Elysia({ name: "write-guard" }).onBeforeHandle(
     const path = new URL(request.url).pathname
     const expected = process.env.API_WRITE_TOKEN?.trim()
 
+    if (isFeedbackList(method, path)) {
+      if (!expected) return reject(set, request, path, "missing_token", 401)
+      const presented = request.headers.get(HEADER)?.trim() ?? ""
+      if (!presented) return reject(set, request, path, "missing_token", 401)
+      if (!tokensMatch(presented, expected)) return reject(set, request, path, "bad_token", 401)
+      return
+    }
+
     if (isOpenApi(path)) {
       if (!expected) return
       const presented = request.headers.get(HEADER)?.trim() ?? ""
@@ -102,9 +118,9 @@ export const writeGuard = new Elysia({ name: "write-guard" }).onBeforeHandle(
     const presented = request.headers.get(HEADER)?.trim() ?? ""
     const trusted = Boolean(expected && presented && tokensMatch(presented, expected))
 
-    if (isFeedbackCreate(method, path) || isAuctionWrite(method, path)) {
-      const feedback = isFeedbackCreate(method, path)
-      if (!(feedback && trusted)) {
+    if (isFeedbackCreate(method, path) || isFeedbackReceipt(method, path) || isAuctionWrite(method, path)) {
+      const feedback = isFeedbackCreate(method, path) || isFeedbackReceipt(method, path)
+      if (!(isFeedbackCreate(method, path) && trusted)) {
         const ip = clientIp(request) ?? "unknown"
         const allowed = takeSlot(
           `${feedback ? "feedback" : "auction"}:${ip}`,
